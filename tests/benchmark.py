@@ -19,7 +19,10 @@ def run_benchmark(file_path):
     size_orig = os.path.getsize(file_path)
     size_comp = os.path.getsize(output)
     print("Compression complete in: {:.4f} seconds".format(end - start))
-    print("Compression ratio: {:.2f}x".format(size_orig / size_comp))
+    if size_comp:
+        print("Compression ratio: {:.2f}x".format(size_orig / size_comp))
+    else:
+        print("Compression ratio: n/a (empty output)")
 
 if __name__ == "__main__":
     run_benchmark("benchmark_test.txt")

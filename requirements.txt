@@ -1,7 +1,5 @@
+# Runtime dependency (CLI progress bar)
+tqdm>=4.60.0
+
 # Testing Framework
 pytest>=6.0
-
-# Development Tools
-# Included for local linting/formatting if you choose to add them later
-# flake8
-# black
