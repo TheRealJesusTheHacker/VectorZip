@@ -2,6 +2,34 @@
 
 All notable changes to VectorZip are documented here.
 
+## [1.2.0] — 2026-09-19
+
+**The workhorse update.** Speed is the feature: incompressible data now flies
+through instead of choking the entropy coder.
+
+### Added
+- Format v2 `.vzip` container: `VZP2` magic + per-chunk flags byte. Files from
+  1.0.0/1.1.0 (format v1) still decompress — the reader auto-detects.
+- Raw-store fallback: chunks that wouldn't shrink are stored literally.
+  Random/already-compressed data compresses at ~800 MB/s, decompresses at
+  ~340 MB/s, and never grows (was: <1 MB/s and +51% size).
+
+### Changed
+- LZ77 sliding window widened 4 KiB → 32 KiB: better ratios on text and code
+  at the same speed.
+- Incompressible-input sampling heuristic skips LZ77+Huffman before they can
+  waste time.
+
+### Performance (measured, 10 MB inputs)
+- Text/repetitive: ~10 MB/s compress, ~15 MB/s decompress, 0.4–1.4% of original
+- Random bytes: ~790 MB/s compress, ~340 MB/s decompress, 100.0% (no bloat)
+- Still 100% lossless: every byte verified identical on round-trip.
+
+### Tests
+- 8 new tests (31 total): v2 magic, no-expansion guarantee, mixed
+  compressible+random chunks, v1 legacy files (normal and expanded) still
+  decompress, corrupt raw chunks rejected, tiny corrupt files rejected.
+
 ## [1.1.0] — 2026-09-19
 
 **The desktop release.** VectorZip grows a full graphical app and one-click

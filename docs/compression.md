@@ -6,8 +6,8 @@ This tool implements a hybrid compression algorithm combining LZ77 and Huffman e
 ## Algorithm Components
 
 ### 1. LZ77 Compression
-- Sliding window dictionary matching (4 KB window)
-- Greedy 3-byte hash-chain matching, match lengths 3..255
+- Sliding window dictionary matching (32 KiB window)
+- Greedy 3-byte hash matching, match lengths 3..255
 - Output: fixed 4-byte tokens `(distance, length, next_byte)` in big-endian `>HBB` layout
 - A distance of 0 marks a literal token (the byte itself)
 
@@ -18,12 +18,21 @@ This tool implements a hybrid compression algorithm combining LZ77 and Huffman e
 
 ## Implementation Details
 
+### The workhorse policy (v1.2.0+)
+Not every chunk is worth compressing. Before the entropy coder runs:
+1. **Sampling heuristic** — a few slices of the chunk are checked for byte
+   diversity. ~all 256 values in a few KiB means random data: store raw.
+2. **LZ77 trial** — if the token stream isn't smaller than the chunk, store raw.
+3. **Huffman trial** — if table + bitstream overhead eats the savings, store raw.
+
+Raw chunks skip LZ77+Huffman entirely, so incompressible data moves at I/O
+speed and a `.vzip` file never exceeds its input size.
+
 ### Compression Process
 1. Read input file (raw bytes) in 64 KiB chunks
-2. Apply LZ77 compression (dictionary matching) per chunk
-3. Apply Huffman encoding (frequency optimization) per chunk
-4. Write chunk: CRC32 of the original chunk, the serialized Huffman table,
-   then the Huffman-packed data
+2. Apply the workhorse policy per chunk (raw-store or LZ77 -> Huffman)
+3. Write chunk: CRC32 of the original chunk, flags, then either the
+   serialized Huffman table + Huffman-packed data, or the raw chunk bytes
 
 ### Decompression Process
 1. Read chunk header (CRC32, table size, padding)
@@ -31,14 +40,26 @@ This tool implements a hybrid compression algorithm combining LZ77 and Huffman e
 3. Huffman-decode -> LZ77-decode -> original chunk bytes
 4. Verify CRC32 per chunk; raise `ValueError` on any mismatch or truncation
 
-### Container Format (all integers big-endian)
+### Container Format v2 (all integers big-endian; VectorZip >= 1.2.0)
 ```
-header:      crc32 u32 | table_len u16 | pad_bits u8
-table:       table_len bytes: per entry symbol u8 | code_bits u8 |
-             ceil(code_bits/8) bytes of code, MSB-first
-data header: encoded_len u32
-data:        encoded_len bytes
+magic:       b'VZP2'
+per chunk:
+  header:      crc32 u32 | table_len u16 | pad_bits u8 | flags u8
+  flags bit 0 (RAW): chunk stored literally
+  if RAW:
+    data header: raw_len u32
+    data:        raw_len bytes (original chunk bytes)
+  else:
+    table:       table_len bytes: per entry symbol u8 | code_bits u8 |
+                 ceil(code_bits/8) bytes of code, MSB-first
+    data header: encoded_len u32
+    data:        encoded_len bytes of Huffman-packed LZ77 tokens
 ```
+
+### Container Format v1 (VectorZip 1.0.0/1.1.0 — still readable)
+Same as v2 but with no magic and no flags byte: the chunk header is
+`crc32 u32 | table_len u16 | pad_bits u8`. The decompressor detects the
+`VZP2` magic and selects the parser automatically.
 
 ## Usage Examples
 

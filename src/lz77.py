@@ -1,7 +1,7 @@
 """LZ77 sliding-window compression with a fixed 4-byte token format.
 
 Token layout (big-endian ``>HBB``):
-    dist  (u16): match distance back into the output (1..4095).
+    dist  (u16): match distance back into the output (1..32768).
                  0 marks a literal token.
     len   (u8):  match length (3..255). 0 on literal tokens.
     next  (u8):  the byte following the match, or the literal byte itself.
@@ -15,7 +15,7 @@ stream decodes unambiguously with no end marker.
 import struct
 
 _TOKEN = struct.Struct('>HBB')
-_WINDOW = 4095
+_WINDOW = 32768
 _MIN_MATCH = 3
 _MAX_MATCH = 255
 

@@ -56,6 +56,9 @@ Switch between **Compress** and **Decompress** modes with one click. Dropping
 
 - **Completely lossless:** decompressing a `.vzip` file returns byte-identical
   data — verified by round-trip tests, never "close enough."
+- **Workhorse fast:** ~10 MB/s on everyday files; incompressible data
+  (random bytes, zips, videos) passes through at ~800 MB/s and never grows
+  the file — stored raw instead of force-compressed.
 - **Corruption-proof:** every 64 KiB chunk carries a CRC32 checked on
   decompression; truncated or damaged archives fail loudly instead of
   silently returning bad data.
@@ -102,9 +105,11 @@ restored = decompress_file(out)     # -> 'input.txt.restored'
 
 ## File format
 
-Each 64 KiB chunk is stored as (all integers big-endian): CRC32 of the
-original chunk, the serialized Huffman code table, then the
-Huffman-packed LZ77 token stream. See [docs/compression.md](docs/compression.md).
+`.vzip` files (v2, since 1.2.0) start with a `VZP2` magic; each 64 KiB chunk
+carries a CRC32, a flags byte, and either the Huffman-packed LZ77 token
+stream or — when compression wouldn't shrink it — the raw chunk bytes.
+Files written by 1.0.0/1.1.0 (v1, no magic) still decompress.
+See [docs/compression.md](docs/compression.md).
 
 ## Running tests
 
