@@ -2,6 +2,14 @@
 
 All notable changes to VectorZip are documented here.
 
+## [1.2.1] — 2026-09-20
+
+**The launch fix.** The GUI exe crashed immediately on startup with
+`AttributeError: End` — the log widget scrolled to the bottom of the log with
+`QTextCursor.MoveMode.End`, an enum value that doesn't exist in PyQt6. Fixed to
+`QTextCursor.MoveOperation.End`. The app now launches and the log scrolls
+correctly.
+
 ## [1.2.0] — 2026-09-19
 
 **The workhorse update.** Speed is the feature: incompressible data now flies

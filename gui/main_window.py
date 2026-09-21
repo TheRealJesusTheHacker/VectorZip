@@ -590,7 +590,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         colors = {"info": TEXT_DIM, "ok": SUCCESS, "warn": WARNING, "err": ERROR}
         stamp = time.strftime("%H:%M:%S")
         cursor = self.log.textCursor()
-        cursor.movePosition(QtGui.QTextCursor.MoveMode.End)
+        cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         block_fmt = QtGui.QTextBlockFormat()
         cursor.setBlockFormat(block_fmt)
         cursor.insertHtml(
