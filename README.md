@@ -105,10 +105,13 @@ restored = decompress_file(out)     # -> 'input.txt.restored'
 
 ## File format
 
-`.vzip` files (v2, since 1.2.0) start with a `VZP2` magic; each 64 KiB chunk
+`.vzip` files (v3, since 1.2.2) start with a `VZP3` magic; each 64 KiB chunk
 carries a CRC32, a flags byte, and either the Huffman-packed LZ77 token
 stream or — when compression wouldn't shrink it — the raw chunk bytes.
-Files written by 1.0.0/1.1.0 (v1, no magic) still decompress.
+The stream ends with an end-of-stream marker chunk, so a truncated file
+can never silently decompress to partial data.
+Files written by 1.2.0/1.2.1 (v2, `VZP2` magic) and 1.0.0/1.1.0
+(v1, no magic) still decompress.
 See [docs/compression.md](docs/compression.md).
 
 ## Running tests

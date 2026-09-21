@@ -1,10 +1,15 @@
 """Chunked file compression: LZ77 -> Huffman -> .vzip container.
 
-Format v2 (written by VectorZip >= 1.2.0):
-    magic:       b'VZP2'
+Format v3 (written by VectorZip >= 1.2.2):
+    magic:       b'VZP3'
     per chunk:
       header:      crc32 u32 | table_len u16 | pad_bits u8 | flags u8  ('>IHBB')
       flags bit 0 (RAW): chunk stored literally, no LZ77/Huffman.
+      flags bit 7 (END): end-of-stream marker chunk; carries no table and
+                         no data. The decompressor requires this marker:
+                         reaching EOF without it means the file was
+                         truncated, and a ValueError is raised instead of
+                         silently returning partial data.
       if RAW:
         data header: raw_len u32                              ('>I')
         data:        raw_len bytes (the original chunk bytes)
@@ -13,8 +18,11 @@ Format v2 (written by VectorZip >= 1.2.0):
         data header: encoded_len u32                          ('>I')
         data:        encoded_len bytes of Huffman-packed LZ77 tokens
 
-Format v1 (VectorZip 1.0.0/1.1.0, no magic, '>IHB' chunk header) is still
-fully readable: the decompressor detects the magic and picks the parser.
+Format v2 (VectorZip 1.2.0/1.2.1, magic ``VZP2``) and format v1
+(VectorZip 1.0.0/1.1.0, no magic, '>IHB' chunk header) are still fully
+readable. Note: v1/v2 files have no end marker, so a v1/v2 file truncated
+exactly at a chunk boundary decompresses to partial data without an
+error; v3 closes that hole.
 
 A chunk is stored RAW whenever compressing it would not shrink it, so
 incompressible data (random bytes, already-compressed files) passes through
@@ -32,11 +40,13 @@ from .huffman import (huffman_encode, huffman_decode,
                       serialize_table, deserialize_table)
 
 _CHUNK = 65536
-_MAGIC = b'VZP2'
+_MAGIC = b'VZP3'
+_MAGIC_V2 = b'VZP2'
 _HEADER_V2 = struct.Struct('>IHBB')  # crc32, table_len, pad_bits, flags
 _HEADER_V1 = struct.Struct('>IHB')   # crc32, table_len, pad_bits (no flags)
 _DATA_HEADER = struct.Struct('>I')   # encoded_len / raw_len
 _FLAG_RAW = 0x01
+_FLAG_END = 0x80
 # Sampling heuristic: slices taken from the start/middle/end of a chunk.
 # Random (incompressible) data shows ~all 256 byte values in a few KiB;
 # text/code/binary show far fewer. Above this many distinct values we
@@ -97,6 +107,41 @@ def _read_exact(fin, n, what):
     return data
 
 
+def _decompress_chunks_v3(fin, fout, progress, total):
+    """v3 chunk loop: identical to v2, but the stream must end with an
+    explicit END marker chunk. EOF without it means a truncated file."""
+    done = 0
+    while True:
+        header = fin.read(_HEADER_V2.size)
+        if not header:
+            raise ValueError('corrupt file: truncated file '
+                             '(missing end-of-stream marker)')
+        if len(header) < _HEADER_V2.size:
+            raise ValueError('corrupt file: truncated chunk header')
+        chk, table_len, pad, flags = _HEADER_V2.unpack(header)
+        if flags & _FLAG_END:
+            if flags & _FLAG_RAW or table_len or pad:
+                raise ValueError('corrupt file: malformed end marker')
+            if fin.read(1):
+                raise ValueError('corrupt file: data after end marker')
+            break
+        if flags & _FLAG_RAW:
+            raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
+            original = _read_exact(fin, raw_len, 'raw chunk data')
+        else:
+            table_blob = _read_exact(fin, table_len, 'Huffman table')
+            table = deserialize_table(table_blob)
+            encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
+            encoded = _read_exact(fin, encoded_len, 'chunk data')
+            original = lz77_decompress(huffman_decode(encoded, pad, table))
+        if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
+            raise ValueError('corrupt file: checksum mismatch')
+        fout.write(original)
+        done += len(original)
+        if progress is not None:
+            progress(done, total)
+
+
 def _decompress_chunks_v2(fin, fout, progress, total):
     done = 0
     while True:
@@ -146,7 +191,7 @@ def _decompress_chunks_v1(fin, fout, progress, total):
 
 
 def compress_file(input_path, progress=None):
-    """Compress ``input_path`` to ``input_path + '.vzip'`` (format v2).
+    """Compress ``input_path`` to ``input_path + '.vzip'`` (format v3).
 
     ``progress`` is an optional callback ``(bytes_done, bytes_total)``
     invoked after each chunk.
@@ -164,6 +209,9 @@ def compress_file(input_path, progress=None):
             done += len(chunk)
             if progress is not None:
                 progress(done, total)
+        # End-of-stream marker: guarantees a truncated file can never
+        # silently decompress to partial data.
+        fout.write(_HEADER_V2.pack(0, 0, 0, _FLAG_END))
     if progress is not None:
         progress(total, total)
     return output_path
@@ -172,9 +220,9 @@ def compress_file(input_path, progress=None):
 def decompress_file(input_path, progress=None):
     """Decompress a ``.vzip`` file; returns the restored file path.
 
-    Reads both format v2 (magic ``VZP2``) and legacy format v1 files.
-    The output never overwrites the input: ``'a.vzip'`` -> ``'a.restored'``,
-    anything else -> ``input + '.restored'``.
+    Reads format v3 (magic ``VZP3``), v2 (magic ``VZP2``), and legacy
+    format v1 files. The output never overwrites the input:
+    ``'a.vzip'`` -> ``'a.restored'``, anything else -> ``input + '.restored'``.
     """
     if input_path.endswith('.vzip'):
         output_path = input_path[:-len('.vzip')] + '.restored'
@@ -186,6 +234,8 @@ def decompress_file(input_path, progress=None):
     with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
         magic = fin.read(len(_MAGIC))
         if magic == _MAGIC:
+            _decompress_chunks_v3(fin, fout, progress, total)
+        elif magic == _MAGIC_V2:
             _decompress_chunks_v2(fin, fout, progress, total)
         elif not magic:
             # empty input -> empty output

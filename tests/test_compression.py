@@ -148,7 +148,55 @@ class TestFormatV2Workhorse(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             vp = self._compress(tmp, b'hello world' * 1000)
             with open(vp, 'rb') as f:
-                self.assertEqual(f.read(4), b'VZP2')
+                self.assertEqual(f.read(4), b'VZP3')  # v3 since 1.2.2
+
+    def test_truncated_at_chunk_boundary_rejected(self):
+        # Regression: a v2 file cut exactly at a chunk boundary used to
+        # silently decompress to partial data. v3 must raise.
+        import random
+        random.seed(7)
+        data = b'chunk-boundary test data. ' * 8000  # > 1 chunk
+        with tempfile.TemporaryDirectory() as tmp:
+            vp = self._compress(tmp, data)
+            with open(vp, 'rb') as f:
+                blob = f.read()
+            # Find the end of the first data chunk (8 = header + 8 = END marker)
+            cut = len(blob) - 8  # strip only the END marker
+            cut_vp = os.path.join(tmp, 'cut.vzip')
+            with open(cut_vp, 'wb') as f:
+                f.write(blob[:cut])
+            with self.assertRaises(ValueError):
+                decompress_file(cut_vp)
+
+    def test_data_after_end_marker_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vp = self._compress(tmp, b'trailing junk test' * 500)
+            with open(vp, 'ab') as f:
+                f.write(b'junk')
+            with self.assertRaises(ValueError):
+                decompress_file(vp)
+
+    def test_v2_file_still_decompresses(self):
+        # Hand-build a legacy v2 file (magic VZP2, no END marker) and read it.
+        import struct
+        import zlib
+        from src.huffman import serialize_table
+        chunk = b'v2 format still works! ' * 500
+        chk = zlib.crc32(chunk) & 0xFFFFFFFF
+        lz_data = lz77_compress(chunk)
+        encoded, pad, table = huffman_encode(lz_data)
+        blob = serialize_table(table)
+        with tempfile.TemporaryDirectory() as tmp:
+            vp = os.path.join(tmp, 'legacy2.vzip')
+            with open(vp, 'wb') as f:
+                f.write(b'VZP2')
+                f.write(struct.pack('>IHBB', chk, len(blob), pad, 0))
+                f.write(blob)
+                f.write(struct.pack('>I', len(encoded)))
+                f.write(encoded)
+            restored = decompress_file(vp)
+            with open(restored, 'rb') as f:
+                self.assertEqual(f.read(), chunk)
 
     def test_random_data_not_expanded(self):
         # Incompressible input must never grow: raw-store fallback.

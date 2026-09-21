@@ -2,6 +2,18 @@
 
 All notable changes to VectorZip are documented here.
 
+## [1.2.2] — 2026-09-20
+
+**The integrity fix.** Bug hunt on the compression core found a real data
+hole: an archive truncated exactly at a chunk boundary (or down to just the
+magic) decompressed silently to partial/empty data with no error. Format v3
+closes it: every archive now ends with an explicit end-of-stream marker
+chunk (`VZP3` magic), and the decompressor raises `ValueError` if the file
+ends without one. Files written by 1.2.0/1.2.1 (v2) and 1.0.0/1.1.0 (v1)
+still decompress. Also fuzzed 196 round-trips across sizes 0–200 KB
+(including 32 KiB window and 64 KiB chunk boundaries) plus a full
+truncate-at-every-offset sweep and 3000 byte-flip trials — no other bugs.
+
 ## [1.2.1] — 2026-09-20
 
 **The launch fix.** The GUI exe crashed immediately on startup with

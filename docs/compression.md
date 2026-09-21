@@ -40,12 +40,15 @@ speed and a `.vzip` file never exceeds its input size.
 3. Huffman-decode -> LZ77-decode -> original chunk bytes
 4. Verify CRC32 per chunk; raise `ValueError` on any mismatch or truncation
 
-### Container Format v2 (all integers big-endian; VectorZip >= 1.2.0)
+### Container Format v3 (all integers big-endian; VectorZip >= 1.2.2)
 ```
-magic:       b'VZP2'
+magic:       b'VZP3'
 per chunk:
   header:      crc32 u32 | table_len u16 | pad_bits u8 | flags u8
   flags bit 0 (RAW): chunk stored literally
+  flags bit 7 (END): end-of-stream marker; carries no table and no data.
+                     The decompressor requires it: reaching EOF without it
+                     raises ValueError instead of returning partial data.
   if RAW:
     data header: raw_len u32
     data:        raw_len bytes (original chunk bytes)
@@ -56,10 +59,15 @@ per chunk:
     data:        encoded_len bytes of Huffman-packed LZ77 tokens
 ```
 
+### Container Format v2 (VectorZip 1.2.0/1.2.1 — still readable)
+Same chunk layout as v3 but with `b'VZP2'` magic and no END marker.
+Note: a v2 file truncated exactly at a chunk boundary decompresses to
+partial data without an error — v3 closes that hole.
+
 ### Container Format v1 (VectorZip 1.0.0/1.1.0 — still readable)
 Same as v2 but with no magic and no flags byte: the chunk header is
 `crc32 u32 | table_len u16 | pad_bits u8`. The decompressor detects the
-`VZP2` magic and selects the parser automatically.
+`VZP3`/`VZP2` magic and selects the parser automatically.
 
 ## Usage Examples
 
