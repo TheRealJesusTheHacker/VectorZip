@@ -47,6 +47,14 @@ _HEADER_V1 = struct.Struct('>IHB')   # crc32, table_len, pad_bits (no flags)
 _DATA_HEADER = struct.Struct('>I')   # encoded_len / raw_len
 _FLAG_RAW = 0x01
 _FLAG_END = 0x80
+# Decompression-bomb hardening. The lengths below come from the file and
+# are attacker-controlled, so every read is capped *before* allocating.
+# Legit raw chunks are never larger than one input chunk (64 KiB); legit
+# encoded chunks are always smaller than the chunk they were made from.
+_MAX_RAW_LEN = 131072        # 128 KiB
+_MAX_ENCODED_LEN = 1048576   # 1 MiB
+_MAX_TABLE_LEN = 1048576     # 1 MiB (the u16 header already caps this at 64 KiB)
+_DEFAULT_MAX_OUTPUT = 8 * 1024 ** 3  # 8 GiB total-output guard
 # Sampling heuristic: slices taken from the start/middle/end of a chunk.
 # Random (incompressible) data shows ~all 256 byte values in a few KiB;
 # text/code/binary show far fewer. Above this many distinct values we
@@ -107,7 +115,26 @@ def _read_exact(fin, n, what):
     return data
 
 
-def _decompress_chunks_v3(fin, fout, progress, total):
+def _read_bounded(fin, n, what, limit):
+    """Like _read_exact, but rejects absurd sizes before allocating.
+
+    ``fin.read(n)`` pre-allocates ``n`` bytes, so an attacker-controlled
+    length must be validated first — otherwise a 4-byte header field can
+    trigger a multi-gigabyte allocation.
+    """
+    if n > limit:
+        raise ValueError(f'corrupt file: {what} size {n} exceeds limit {limit}')
+    return _read_exact(fin, n, what)
+
+
+def _check_output_limit(done, max_output):
+    if done > max_output:
+        raise ValueError(
+            f'corrupt file: decompressed output exceeds {max_output} bytes '
+            f'(possible decompression bomb)')
+
+
+def _decompress_chunks_v3(fin, fout, progress, total, max_output):
     """v3 chunk loop: identical to v2, but the stream must end with an
     explicit END marker chunk. EOF without it means a truncated file."""
     done = 0
@@ -127,22 +154,23 @@ def _decompress_chunks_v3(fin, fout, progress, total):
             break
         if flags & _FLAG_RAW:
             raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            original = _read_exact(fin, raw_len, 'raw chunk data')
+            original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
         else:
-            table_blob = _read_exact(fin, table_len, 'Huffman table')
+            table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
             table = deserialize_table(table_blob)
             encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            encoded = _read_exact(fin, encoded_len, 'chunk data')
+            encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
             original = lz77_decompress(huffman_decode(encoded, pad, table))
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)
         done += len(original)
+        _check_output_limit(done, max_output)
         if progress is not None:
             progress(done, total)
 
 
-def _decompress_chunks_v2(fin, fout, progress, total):
+def _decompress_chunks_v2(fin, fout, progress, total, max_output):
     done = 0
     while True:
         header = fin.read(_HEADER_V2.size)
@@ -153,22 +181,23 @@ def _decompress_chunks_v2(fin, fout, progress, total):
         chk, table_len, pad, flags = _HEADER_V2.unpack(header)
         if flags & _FLAG_RAW:
             raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            original = _read_exact(fin, raw_len, 'raw chunk data')
+            original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
         else:
-            table_blob = _read_exact(fin, table_len, 'Huffman table')
+            table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
             table = deserialize_table(table_blob)
             encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            encoded = _read_exact(fin, encoded_len, 'chunk data')
+            encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
             original = lz77_decompress(huffman_decode(encoded, pad, table))
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)
         done += len(original)
+        _check_output_limit(done, max_output)
         if progress is not None:
             progress(done, total)
 
 
-def _decompress_chunks_v1(fin, fout, progress, total):
+def _decompress_chunks_v1(fin, fout, progress, total, max_output):
     done = 0
     while True:
         header = fin.read(_HEADER_V1.size)
@@ -177,15 +206,16 @@ def _decompress_chunks_v1(fin, fout, progress, total):
         if len(header) < _HEADER_V1.size:
             raise ValueError('corrupt file: truncated chunk header')
         chk, table_len, pad = _HEADER_V1.unpack(header)
-        table_blob = _read_exact(fin, table_len, 'Huffman table')
+        table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
         table = deserialize_table(table_blob)
         encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-        encoded = _read_exact(fin, encoded_len, 'chunk data')
+        encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
         original = lz77_decompress(huffman_decode(encoded, pad, table))
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)
         done += len(original)
+        _check_output_limit(done, max_output)
         if progress is not None:
             progress(done, total)
 
@@ -217,12 +247,16 @@ def compress_file(input_path, progress=None):
     return output_path
 
 
-def decompress_file(input_path, progress=None):
+def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUTPUT):
     """Decompress a ``.vzip`` file; returns the restored file path.
 
     Reads format v3 (magic ``VZP3``), v2 (magic ``VZP2``), and legacy
     format v1 files. The output never overwrites the input:
     ``'a.vzip'`` -> ``'a.restored'``, anything else -> ``input + '.restored'``.
+
+    ``max_output_bytes`` caps the total decompressed output (default 8 GiB)
+    as a last line of defense against decompression bombs; pass ``None``
+    to disable.
     """
     if input_path.endswith('.vzip'):
         output_path = input_path[:-len('.vzip')] + '.restored'
@@ -230,13 +264,15 @@ def decompress_file(input_path, progress=None):
         output_path = input_path + '.restored'
     if os.path.abspath(output_path) == os.path.abspath(input_path):
         raise ValueError('refusing to overwrite the input file')
+    if max_output_bytes is None:
+        max_output_bytes = float('inf')
     total = os.path.getsize(input_path)
     with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
         magic = fin.read(len(_MAGIC))
         if magic == _MAGIC:
-            _decompress_chunks_v3(fin, fout, progress, total)
+            _decompress_chunks_v3(fin, fout, progress, total, max_output_bytes)
         elif magic == _MAGIC_V2:
-            _decompress_chunks_v2(fin, fout, progress, total)
+            _decompress_chunks_v2(fin, fout, progress, total, max_output_bytes)
         elif not magic:
             # empty input -> empty output
             pass
@@ -245,7 +281,7 @@ def decompress_file(input_path, progress=None):
         else:
             # Legacy v1 file: rewind and parse with the old header layout.
             fin.seek(0)
-            _decompress_chunks_v1(fin, fout, progress, total)
+            _decompress_chunks_v1(fin, fout, progress, total, max_output_bytes)
     if progress is not None:
         progress(total, total)
     return output_path
