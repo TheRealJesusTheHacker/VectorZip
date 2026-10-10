@@ -37,6 +37,7 @@ def huffman_encode(data):
         while nbits >= 8:
             nbits -= 8
             bits.append((acc >> nbits) & 0xFF)
+        acc &= (1 << nbits) - 1  # drop emitted bits; keeps acc O(1) in size
     pad = (8 - nbits) % 8
     if nbits:
         bits.append((acc << pad) & 0xFF)
