@@ -2,15 +2,15 @@ from setuptools import setup
 
 setup(
     name="VectorZip",
-    version="1.2.0",
+    version="1.2.2",
     description="A lossless, chunked-processing compression utility.",
     author="VectorZip Developer",
     packages=["vectorzip", "gui"],
     package_dir={"vectorzip": "src", "gui": "gui"},
     py_modules=["main", "gui_launcher"],
     install_requires=[
-        "tqdm>=4.60.0",
-        "PyQt6>=6.5.0",
+        "tqdm==4.70.1",
+        "PyQt6==6.11.0",
     ],
     entry_points={
         'console_scripts': [
