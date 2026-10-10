@@ -27,25 +27,66 @@ def huffman_encode(data):
         # be '' and encode to zero bits. Assign a 1-bit code instead.
         sole = next(iter(table))
         table[sole] = '0'
-    bits = ''.join(table[b] for b in data)
-    pad = (8 - (len(bits) % 8)) % 8
-    bits += '0' * pad
-    arr = bytearray(int(bits[i:i + 8], 2) for i in range(0, len(bits), 8))
-    return bytes(arr), pad, table
+    bits = bytearray()
+    acc = 0
+    nbits = 0
+    for b in data:
+        code = table[b]
+        acc = (acc << len(code)) | int(code, 2)
+        nbits += len(code)
+        while nbits >= 8:
+            nbits -= 8
+            bits.append((acc >> nbits) & 0xFF)
+    pad = (8 - nbits) % 8
+    if nbits:
+        bits.append((acc << pad) & 0xFF)
+    return bytes(bits), pad, table
 
 
 def huffman_decode(encoded_data, padding, table):
-    """Decode packed bytes using ``table`` (inverse of huffman_encode)."""
-    reverse_table = {v: k for k, v in table.items()}
-    bits = ''.join(bin(b)[2:].zfill(8) for b in encoded_data)
-    if padding > 0:
-        bits = bits[:-padding]
-    decoded, buffer = bytearray(), ""
-    for bit in bits:
-        buffer += bit
-        if buffer in reverse_table:
-            decoded.append(reverse_table[buffer])
-            buffer = ""
+    """Decode packed bytes using ``table`` (inverse of huffman_encode).
+
+    Table-driven: the code table is compiled into a binary decode tree
+    once, then the input is consumed byte-at-a-time through a bit cursor.
+    Never materializes the bitstream as a string (the old implementation
+    expanded every input byte into 8 characters).
+    """
+    if not table or not encoded_data:
+        return b''
+    # Compile the prefix-free code table into a decode tree.
+    # Internal nodes: {'0': child, '1': child}; leaves: {'sym': byte}.
+    root = {}
+    for symbol, code in table.items():
+        node = root
+        for bit in code:
+            child = node.get(bit)
+            if child is None:
+                child = {}
+                node[bit] = child
+            node = child
+        node['sym'] = symbol
+    total_bits = len(encoded_data) * 8 - padding
+    if total_bits <= 0:
+        return b''
+    decoded = bytearray()
+    node = root
+    seen = 0
+    for byte in encoded_data:
+        remaining = total_bits - seen
+        if remaining <= 0:
+            break
+        take = 8 if remaining >= 8 else remaining
+        # Consume `take` bits MSB-first.
+        for shift in range(7, 7 - take, -1):
+            try:
+                node = node['1' if (byte >> shift) & 1 else '0']
+            except KeyError:
+                raise ValueError('corrupt file: invalid Huffman bitstream')
+            sym = node.get('sym')
+            if sym is not None:
+                decoded.append(sym)
+                node = root
+        seen += take
     return bytes(decoded)
 
 
