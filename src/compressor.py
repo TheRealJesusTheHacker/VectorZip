@@ -127,11 +127,35 @@ def _read_bounded(fin, n, what, limit):
     return _read_exact(fin, n, what)
 
 
+def _format_cap(max_output):
+    if max_output % 1024**3 == 0:
+        return f'{int(max_output // 1024**3)} GiB'
+    return f'{int(max_output)} bytes'
+
+
 def _check_output_limit(done, max_output):
     if done > max_output:
         raise ValueError(
-            f'corrupt file: decompressed output exceeds {max_output} bytes '
-            f'(possible decompression bomb)')
+            f'decompressed output exceeds the safety cap of {_format_cap(max_output)} '
+            f'(possible decompression bomb); use --max-output-gb or '
+            f'--no-output-limit to override')
+
+
+def _open_new_output(path):
+    """Open ``path`` for writing, refusing if anything already exists there.
+
+    ``O_CREAT|O_EXCL`` makes the existence check atomic (no TOCTOU race),
+    and ``O_NOFOLLOW`` (where the platform provides it) stops a pre-planted
+    symlink from redirecting the write elsewhere.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, 'O_NOFOLLOW', 0)
+    fd = os.open(path, flags, 0o666)
+    return os.fdopen(fd, 'wb')
+
+
+def _output_writer(path, overwrite):
+    return open(path, 'wb') if overwrite else _open_new_output(path)
 
 
 def _decompress_chunks_v3(fin, fout, progress, total, max_output):
@@ -220,16 +244,24 @@ def _decompress_chunks_v1(fin, fout, progress, total, max_output):
             progress(done, total)
 
 
-def compress_file(input_path, progress=None):
+def compress_file(input_path, progress=None, overwrite=False):
     """Compress ``input_path`` to ``input_path + '.vzip'`` (format v3).
 
     ``progress`` is an optional callback ``(bytes_done, bytes_total)``
     invoked after each chunk.
+
+    ``overwrite`` must be True to clobber an existing output file;
+    otherwise a ``FileExistsError`` is raised, and a symlink at the
+    output path is never followed.
     """
     output_path = input_path + '.vzip'
+    if not overwrite and os.path.lexists(output_path):
+        raise FileExistsError(
+            f'refusing to overwrite existing output: {output_path} '
+            f'(pass overwrite=True to allow it)')
     total = os.path.getsize(input_path)
     done = 0
-    with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+    with open(input_path, 'rb') as fin, _output_writer(output_path, overwrite) as fout:
         fout.write(_MAGIC)
         while True:
             chunk = fin.read(_CHUNK)
@@ -247,7 +279,8 @@ def compress_file(input_path, progress=None):
     return output_path
 
 
-def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUTPUT):
+def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUTPUT,
+                    overwrite=False):
     """Decompress a ``.vzip`` file; returns the restored file path.
 
     Reads format v3 (magic ``VZP3``), v2 (magic ``VZP2``), and legacy
@@ -257,6 +290,10 @@ def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUT
     ``max_output_bytes`` caps the total decompressed output (default 8 GiB)
     as a last line of defense against decompression bombs; pass ``None``
     to disable.
+
+    ``overwrite`` must be True to clobber an existing output file;
+    otherwise a ``FileExistsError`` is raised, and a symlink at the
+    output path is never followed.
     """
     if input_path.endswith('.vzip'):
         output_path = input_path[:-len('.vzip')] + '.restored'
@@ -264,10 +301,14 @@ def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUT
         output_path = input_path + '.restored'
     if os.path.abspath(output_path) == os.path.abspath(input_path):
         raise ValueError('refusing to overwrite the input file')
+    if not overwrite and os.path.lexists(output_path):
+        raise FileExistsError(
+            f'refusing to overwrite existing output: {output_path} '
+            f'(pass overwrite=True to allow it)')
     if max_output_bytes is None:
         max_output_bytes = float('inf')
     total = os.path.getsize(input_path)
-    with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+    with open(input_path, 'rb') as fin, _output_writer(output_path, overwrite) as fout:
         magic = fin.read(len(_MAGIC))
         if magic == _MAGIC:
             _decompress_chunks_v3(fin, fout, progress, total, max_output_bytes)
