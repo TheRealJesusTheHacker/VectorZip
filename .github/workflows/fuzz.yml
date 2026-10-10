@@ -1,0 +1,31 @@
+name: Fuzz decompressor
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+  schedule:
+    - cron: '0 3 * * 0'  # weekly, Sunday 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz decompress
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v5
+        with:
+          python-version: "3.11"
+      - name: Run decompressor fuzzer
+        run: python tests/fuzz_decompress.py --seconds 300
