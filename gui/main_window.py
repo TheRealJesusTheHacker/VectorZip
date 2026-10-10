@@ -206,7 +206,7 @@ class JobWorker(QtCore.QObject):
                 try:
                     in_size = os.path.getsize(path)
                     func = compress_file if self.mode == "compress" else decompress_file
-                    out = func(path, progress=self._progress_cb(label))
+                    out = func(path, progress=self._progress_cb(label), overwrite=self.overwrite)
                     if self.out_dir and os.path.dirname(os.path.abspath(out)) != os.path.abspath(self.out_dir):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
                         if os.path.exists(dest) and not self.overwrite:
