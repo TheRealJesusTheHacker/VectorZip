@@ -2,6 +2,24 @@
 
 All notable changes to VectorZip are documented here.
 
+## [1.2.3] — 2026-10-10
+
+**The hardening release.** Two full security audits plus performance passes.
+
+### Security
+- Decompression bombs closed: chunk-length caps validated before allocation,
+  plus an 8 GiB total-output cap (`--max-output-gb` / `--no-output-limit` to override)
+- `MemoryError` now fails cleanly in CLI and GUI instead of killing the thread
+- `compress`/`decompress` refuse to overwrite existing outputs without
+  `overwrite=True` / `--force`; atomic `O_EXCL` opens (`O_NOFOLLOW` where available)
+- Cancelled CLI jobs quarantine partial outputs to `.partial`
+- CI least-privilege; pip dependencies and GitHub Actions pinned to SHAs
+
+### Performance
+- Huffman decode rewritten table-driven; encode uses a bit-buffer
+  (fixed an O(n²) accumulator regression: 694 ms → 70 ms per 64 KiB chunk)
+- Integer codes precomputed once per table
+
 ## [1.2.2] — 2026-09-20
 
 **The integrity fix.** Bug hunt on the compression core found a real data
