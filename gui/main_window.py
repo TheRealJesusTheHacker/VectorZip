@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import time
+import html
 import traceback
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -175,6 +176,27 @@ class JobWorker(QtCore.QObject):
 
         return _cb
 
+    def _expected_output(self, path):
+        """Where func() writes its output before any out_dir move.
+
+        Mirrors compress_file/decompress_file naming exactly.
+        """
+        if self.mode == "compress":
+            return path + ".vzip"
+        if path.endswith(".vzip"):
+            return path[:-len(".vzip")] + ".restored"
+        return path + ".restored"
+
+    def _quarantine_partial(self, path):
+        """Rename a half-written output to .partial so a cancelled or
+        OOM-killed job can't leave something that looks like a good result."""
+        partial = self._expected_output(path)
+        if os.path.exists(partial):
+            try:
+                os.rename(partial, partial + ".partial")
+            except OSError:
+                pass
+
     def run(self):
         try:
             for path in self.jobs:
@@ -195,8 +217,14 @@ class JobWorker(QtCore.QObject):
                     detail = f"{fmt_bytes(in_size)} → {fmt_bytes(out_size)}"
                     self.file_done.emit(path, True, detail, in_size, out_size)
                 except InterruptedError:
+                    self._quarantine_partial(path)
                     self.file_done.emit(path, False, "Cancelled", 0, 0)
                     break
+                except MemoryError:
+                    # MemoryError inherits BaseException, not Exception —
+                    # without this the worker thread dies on a raw traceback.
+                    self._quarantine_partial(path)
+                    self.file_done.emit(path, False, "Out of memory — file may be corrupt", 0, 0)
                 except Exception:
                     self.file_done.emit(path, False, traceback.format_exc(limit=1).strip().splitlines()[-1], 0, 0)
         finally:
@@ -593,9 +621,12 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         block_fmt = QtGui.QTextBlockFormat()
         cursor.setBlockFormat(block_fmt)
+        # Filenames flow into log messages — escape before insertHtml so a
+        # file named "<b>..." can't inject markup into the activity log.
+        safe = html.escape(message)
         cursor.insertHtml(
             f'<span style="color:#5b6a7e">[{stamp}]</span> '
-            f'<span style="color:{colors.get(kind, TEXT_DIM)}">{message}</span><br>'
+            f'<span style="color:{colors.get(kind, TEXT_DIM)}">{safe}</span><br>'
         )
         self.log.setTextCursor(cursor)
         self.log.ensureCursorVisible()

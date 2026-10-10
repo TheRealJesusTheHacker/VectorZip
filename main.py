@@ -42,6 +42,13 @@ def main():
         else:
             output = _run_with_progress("Decompressing", decompress_file, args.file)
             print("Success! Extracted: {}".format(output))
+    except MemoryError:
+        # MemoryError inherits BaseException, not Exception, so it needs
+        # its own handler — otherwise a decompression bomb kills the CLI
+        # with a raw traceback instead of a clean error.
+        print("Error: out of memory — the input file may be corrupt or "
+              "a decompression bomb")
+        sys.exit(1)
     except Exception as e:
         print("Error: Operation failed - {}".format(e))
         sys.exit(1)
