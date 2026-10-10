@@ -27,13 +27,15 @@ def huffman_encode(data):
         # be '' and encode to zero bits. Assign a 1-bit code instead.
         sole = next(iter(table))
         table[sole] = '0'
+    # Integer codes precomputed once per table instead of per input byte.
+    int_table = {sym: (int(code, 2), len(code)) for sym, code in table.items()}
     bits = bytearray()
     acc = 0
     nbits = 0
     for b in data:
-        code = table[b]
-        acc = (acc << len(code)) | int(code, 2)
-        nbits += len(code)
+        icode, clen = int_table[b]
+        acc = (acc << clen) | icode
+        nbits += clen
         while nbits >= 8:
             nbits -= 8
             bits.append((acc >> nbits) & 0xFF)
