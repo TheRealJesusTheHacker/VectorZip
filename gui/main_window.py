@@ -209,8 +209,13 @@ class JobWorker(QtCore.QObject):
                     out = func(path, progress=self._progress_cb(label), overwrite=self.overwrite)
                     if self.out_dir and os.path.dirname(os.path.abspath(out)) != os.path.abspath(self.out_dir):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
-                        if os.path.exists(dest) and not self.overwrite:
-                            raise FileExistsError(f"output exists: {os.path.basename(dest)}")
+                        if os.path.lexists(dest):
+                            if not self.overwrite:
+                                raise FileExistsError(f"output exists: {os.path.basename(dest)}")
+                            # shutil.move uses os.rename, which refuses to
+                            # replace an existing file on Windows — clear it
+                            # first so overwrite works there too.
+                            os.remove(dest)
                         shutil.move(out, dest)
                         out = dest
                     out_size = os.path.getsize(out)
@@ -524,7 +529,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
                 out_probe = os.path.basename(p) + ".vzip"
             else:
                 base = os.path.basename(p)
-                out_probe = base[:-5] + ".restored" if base.lower().endswith(".vzip") else base + ".restored"
+                out_probe = base[:-5] + ".restored" if base.endswith(".vzip") else base + ".restored"
             dest_dir = out_dir or os.path.dirname(os.path.abspath(p))
             if os.path.exists(os.path.join(dest_dir, out_probe)) and not self.overwrite_chk.isChecked():
                 self.table.setItem(self._row_for[p], self.COL_STATUS, self._status_item("Skipped", WARNING))
