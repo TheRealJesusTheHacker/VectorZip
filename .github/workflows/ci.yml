@@ -46,3 +46,38 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Run test suite
         run: python -m pytest tests/ -v
+
+  lint:
+    name: Lint & format check (ruff + black)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install linters (pinned)
+        run: pip install "ruff==0.17.0" "black==26.10.1"
+      - name: Ruff
+        run: ruff check src main.py gui_launcher.py gui tests
+      - name: Black format check
+        run: black --check --skip-string-normalization -l 100 src main.py gui_launcher.py gui tests
+
+  cli-roundtrip:
+    name: CLI compress/decompress round-trip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+      - name: Build a mixed test file (compressible text + random bytes)
+        run: |
+          python -c "import os; open('roundtrip.bin','wb').write(b'VectorZip round-trip fixture. ' * 20000 + os.urandom(200000) + open('main.py','rb').read() * 4)"
+      - name: Compress then decompress with the vzip CLI
+        run: |
+          python main.py compress roundtrip.bin
+          python main.py decompress roundtrip.bin.vzip
+      - name: Outputs must be byte-identical
+        run: cmp roundtrip.bin roundtrip.bin.restored
