@@ -4,6 +4,7 @@ Batch compress/decompress with drag-and-drop, live progress,
 per-file statistics and a color-coded activity log.
 """
 
+import errno
 import os
 import shutil
 import sys
@@ -150,6 +151,90 @@ def fmt_bytes(num):
 
 
 # ---------------------------------------------------------------------------
+# Filesystem helpers (shared by the worker and the pre-flight planner)
+# ---------------------------------------------------------------------------
+
+
+def _expected_output(path, mode):
+    """Where compress/decompress writes its output for ``path``.
+
+    Single source of truth for the worker, the quarantine logic, and the
+    pre-flight planner — mirrors compress_file/decompress_file naming
+    exactly.
+    """
+    if mode == 'compress':
+        return path + '.vzip'
+    if path.endswith('.vzip'):
+        return path[: -len('.vzip')] + '.restored'
+    return path + '.restored'
+
+
+def _move_noclobber(src, dest, overwrite):
+    """Move ``src`` to ``dest``.
+
+    With ``overwrite=False`` the refusal is atomic: the destination is
+    claimed with a hard link (an ``O_EXCL``-claimed copy across
+    filesystems), so no check-then-move race can silently replace a file
+    that appeared in between. With ``overwrite=True`` the replacement is
+    a single atomic ``os.replace`` (which, unlike ``os.rename``, also
+    replaces on Windows). A symlink at ``dest`` is never followed.
+    """
+    if os.path.isdir(dest) and not os.path.islink(dest):
+        raise IsADirectoryError(f'output destination is a directory: {dest}')
+    if overwrite:
+        os.replace(src, dest)
+        return
+    try:
+        os.link(src, dest)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            raise FileExistsError(f'output exists: {os.path.basename(dest)}')
+        if e.errno != errno.EXDEV:
+            raise
+        # Cross-filesystem: claim dest atomically, then copy into it.
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        try:
+            with os.fdopen(fd, 'wb') as fout, open(src, 'rb') as fin:
+                shutil.copyfileobj(fin, fout)
+        except BaseException:
+            try:
+                os.unlink(dest)
+            except OSError:
+                pass
+            raise
+        os.unlink(src)
+        return
+    os.unlink(src)
+
+
+def _plan_jobs(jobs, mode, out_dir, overwrite):
+    """Pre-flight planner: which jobs to run, which to skip and why.
+
+    Returns ``(run, skipped)`` where ``skipped`` is a list of
+    ``(path, reason)``. A job is skipped when its planned output already
+    exists (unless ``overwrite``) or when its output name collides with
+    another job in the same batch — otherwise a later job would silently
+    replace an earlier job's good output (or, on refusal, quarantine it).
+    Pure function: no Qt involved, fully unit-testable.
+    """
+    run, skipped = [], []
+    seen = set()
+    for p in jobs:
+        dest_dir = out_dir or os.path.dirname(os.path.abspath(p))
+        dest_path = os.path.join(dest_dir, os.path.basename(_expected_output(p, mode)))
+        key = os.path.normcase(os.path.normpath(dest_path))
+        if os.path.lexists(dest_path) and not overwrite:
+            skipped.append((p, 'Output exists'))
+            continue
+        if key in seen:
+            skipped.append((p, 'Duplicate output in batch'))
+            continue
+        seen.add(key)
+        run.append(p)
+    return run, skipped
+
+
+# ---------------------------------------------------------------------------
 # Background worker
 # ---------------------------------------------------------------------------
 
@@ -178,21 +263,10 @@ class JobWorker(QtCore.QObject):
 
         return _cb
 
-    def _expected_output(self, path):
-        """Where func() writes its output before any out_dir move.
-
-        Mirrors compress_file/decompress_file naming exactly.
-        """
-        if self.mode == "compress":
-            return path + ".vzip"
-        if path.endswith(".vzip"):
-            return path[: -len(".vzip")] + ".restored"
-        return path + ".restored"
-
     def _quarantine_partial(self, path):
         """Rename a half-written output to .partial so a cancelled or
         OOM-killed job can't leave something that looks like a good result."""
-        partial = self._expected_output(path)
+        partial = _expected_output(path, self.mode)
         if os.path.exists(partial):
             try:
                 os.rename(partial, partial + ".partial")
@@ -213,14 +287,7 @@ class JobWorker(QtCore.QObject):
                         self.out_dir
                     ):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
-                        if os.path.lexists(dest):
-                            if not self.overwrite:
-                                raise FileExistsError(f"output exists: {os.path.basename(dest)}")
-                            # shutil.move uses os.rename, which refuses to
-                            # replace an existing file on Windows — clear it
-                            # first so overwrite works there too.
-                            os.remove(dest)
-                        shutil.move(out, dest)
+                        _move_noclobber(out, dest, self.overwrite)
                         out = dest
                     out_size = os.path.getsize(out)
                     detail = f"{fmt_bytes(in_size)} → {fmt_bytes(out_size)}"
@@ -234,6 +301,11 @@ class JobWorker(QtCore.QObject):
                     # without this the worker thread dies on a raw traceback.
                     self._quarantine_partial(path)
                     self.file_done.emit(path, False, "Out of memory — file may be corrupt", 0, 0)
+                except FileExistsError:
+                    # Overwrite refusal, not a mid-write failure: the
+                    # existing output was never touched, so there is
+                    # nothing to quarantine.
+                    self.file_done.emit(path, False, "Output exists (not overwritten)", 0, 0)
                 except Exception:
                     # A corrupt archive fails mid-write: quarantine the
                     # half-written output so it can't look like a good result.
@@ -263,6 +335,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         self._thread = None
         self._worker = None
         self._start_time = None
+        self._closing = False
         self._stats = {"files": 0, "in": 0, "out": 0}
 
         self._build_ui()
@@ -459,6 +532,12 @@ class VectorZipWindow(QtWidgets.QMainWindow):
             return 0
         if mode == "decompress" and not path.lower().endswith(".vzip"):
             return 0
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            # Vanished (or became unreadable) between the dialog/drop and here.
+            self._log(f"Skipped unreadable file: {path}", "warn")
+            return 0
         row = self.table.rowCount()
         self.table.insertRow(row)
         name_item = QtWidgets.QTableWidgetItem(os.path.basename(path))
@@ -466,9 +545,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         font = QtGui.QFont("Consolas", 10)
         name_item.setFont(font)
         self.table.setItem(row, self.COL_FILE, name_item)
-        self.table.setItem(
-            row, self.COL_SIZE, QtWidgets.QTableWidgetItem(fmt_bytes(os.path.getsize(path)))
-        )
+        self.table.setItem(row, self.COL_SIZE, QtWidgets.QTableWidgetItem(fmt_bytes(size)))
         self.table.setItem(row, self.COL_STATUS, self._status_item("Queued", TEXT_DIM))
         self.table.setItem(row, self.COL_RESULT, QtWidgets.QTableWidgetItem("—"))
         self._jobs.append(path)
@@ -541,30 +618,17 @@ class VectorZipWindow(QtWidgets.QMainWindow):
                 self, "Output folder", "That output folder does not exist."
             )
             return
-        # Pre-flight: drop jobs whose output already exists (unless overwrite)
-        jobs = []
-        for p in self._jobs:
-            if mode == "compress":
-                out_probe = os.path.basename(p) + ".vzip"
-            else:
-                base = os.path.basename(p)
-                out_probe = (
-                    base[:-5] + ".restored" if base.endswith(".vzip") else base + ".restored"
-                )
-            dest_dir = out_dir or os.path.dirname(os.path.abspath(p))
-            if (
-                os.path.exists(os.path.join(dest_dir, out_probe))
-                and not self.overwrite_chk.isChecked()
-            ):
-                self.table.setItem(
-                    self._row_for[p], self.COL_STATUS, self._status_item("Skipped", WARNING)
-                )
-                self.table.setItem(
-                    self._row_for[p], self.COL_RESULT, QtWidgets.QTableWidgetItem("Output exists")
-                )
-                self._log(f"Skipped (output exists): {out_probe}", "warn")
-                continue
-            jobs.append(p)
+        # Pre-flight: drop jobs whose output already exists (unless
+        # overwrite), and drop jobs whose output name collides with another
+        # job in this batch — otherwise a later job would silently replace
+        # an earlier job's good output (or, on refusal, quarantine it).
+        jobs, skipped = _plan_jobs(self._jobs, mode, out_dir, self.overwrite_chk.isChecked())
+        for p, reason in skipped:
+            self._mark_skipped(p, reason)
+            self._log(
+                f"Skipped ({reason.lower()}): {os.path.basename(_expected_output(p, mode))}",
+                "warn",
+            )
         if not jobs:
             self._log("Nothing to do — all outputs already exist.", "warn")
             self._refresh_buttons()
@@ -590,8 +654,32 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         self._worker.finished.connect(self._thread.quit)
         self._worker.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.finished.connect(self._deferred_close)
         self._thread.start()
         self._refresh_buttons()
+
+    def _mark_skipped(self, path, reason):
+        self.table.setItem(
+            self._row_for[path], self.COL_STATUS, self._status_item("Skipped", WARNING)
+        )
+        self.table.setItem(self._row_for[path], self.COL_RESULT, QtWidgets.QTableWidgetItem(reason))
+
+    def closeEvent(self, event):
+        # Never destroy a running worker thread with the window: that is a
+        # hard Qt crash ("QThread: Destroyed while thread is still running").
+        # Cancel instead and finish the close once the thread has exited.
+        if self._thread is not None and self._thread.isRunning():
+            self._log("Cancelling running jobs before exit…", "warn")
+            if self._worker is not None:
+                self._worker.cancelled = True
+            self._closing = True
+            event.ignore()
+            return
+        event.accept()
+
+    def _deferred_close(self):
+        if self._closing:
+            self.close()
 
     def _cancel(self):
         if self._worker:

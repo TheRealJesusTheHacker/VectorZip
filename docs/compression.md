@@ -49,6 +49,8 @@ per chunk:
   flags bit 7 (END): end-of-stream marker; carries no table and no data.
                      The decompressor requires it: reaching EOF without it
                      raises ValueError instead of returning partial data.
+  all other flag bits are reserved: a chunk carrying an unknown flag bit
+                     is rejected with ValueError rather than misparsed.
   if RAW:
     data header: raw_len u32
     data:        raw_len bytes (original chunk bytes)

@@ -97,6 +97,11 @@ def main():
         _quarantine_partial(expected)
         print("Error: out of memory — the input file may be corrupt or " "a decompression bomb")
         sys.exit(1)
+    except FileExistsError as e:
+        # Overwrite refusal: the existing output was never touched, so
+        # there is no partial output to quarantine — leave it alone.
+        print("Error: {}".format(e))
+        sys.exit(1)
     except Exception as e:
         # A corrupt archive fails mid-write, so the half-written output must
         # be quarantined just like a cancelled job — otherwise it looks like

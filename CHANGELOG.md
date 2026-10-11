@@ -15,6 +15,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Partial outputs are now quarantined to `.partial` on *any* failed CLI or
   GUI job, not just cancelled/out-of-memory ones — a corrupt archive can no
   longer leave a half-written file that looks like a finished result.
+- Unknown chunk flag bits are rejected with `ValueError` instead of being
+  misparsed (v3 allows only RAW/END; v2 only RAW — v2 never had an END
+  marker, so `0x80` there is foreign).
+
+### Fixed
+- Overwrite refusals no longer quarantine: a CLI/GUI job that fails with
+  `FileExistsError` used to rename the *pre-existing* good output to
+  `.partial` — the refusal path now leaves it untouched (quarantine only
+  fires when the job actually wrote output).
+- `compress_file` now fingerprints the input (inode, size, mtime) and
+  raises `IOError` if it changed mid-job, instead of silently writing a
+  torn archive that looks complete.
+- GUI worker: the output-folder move is now atomic — a hard-link claim
+  (`O_EXCL`-claimed copy across filesystems) with `overwrite=False`, a
+  single `os.replace` with `overwrite=True` — closing the check-then-move
+  overwrite race and the Windows rename-replace workaround.
+- GUI pre-flight now skips batch jobs whose output name collides with
+  another job in the batch, so a later job can never silently replace (or,
+  on refusal, quarantine) an earlier job's good output.
+- Closing the GUI mid-batch no longer destroys a running `QThread` (a hard
+  Qt crash): the close cancels the worker and completes once the thread
+  has exited.
+- GUI queue no longer throws if a file vanishes between the dialog/drop
+  and enqueue — it is skipped with a log line.
 
 ### Added
 - Lint/format enforcement in CI (ruff + black) with pinned versions and a
@@ -22,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI compress → decompress → byte-compare round-trip as a CI job.
 - GitHub issue (bug/feature) and pull request templates.
 - Detailed README feature rundown with verification notes.
+- 16 new tests (53 total): torn-input detection, unknown chunk flags,
+  CLI/GUI quarantine semantics on refusal, atomic no-clobber move, batch
+  duplicate-output planning, and cancel-mid-job.
 
 ## [1.2.3] — 2026-10-10
 

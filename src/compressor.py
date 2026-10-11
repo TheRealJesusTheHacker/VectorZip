@@ -10,6 +10,8 @@ Format v3 (written by VectorZip >= 1.2.2):
                          reaching EOF without it means the file was
                          truncated, and a ValueError is raised instead of
                          silently returning partial data.
+      All other flag bits are reserved: a chunk carrying an unknown flag
+      bit is rejected with ValueError rather than misparsed.
       if RAW:
         data header: raw_len u32                              ('>I')
         data:        raw_len bytes (the original chunk bytes)
@@ -167,6 +169,17 @@ def _output_writer(path, overwrite):
     return open(path, 'wb') if overwrite else _open_new_output(path)
 
 
+def _input_fingerprint(path):
+    """Identity snapshot of the input file: inode, size, and mtime.
+
+    Compared before/after compression so a file that changed mid-job
+    (concurrent writer, truncation, replacement) fails loudly instead of
+    producing a torn archive that looks complete.
+    """
+    st = os.stat(path)
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+
 def _decompress_chunks_v3(fin, fout, progress, total, max_output):
     """v3 chunk loop: identical to v2, but the stream must end with an
     explicit END marker chunk. EOF without it means a truncated file."""
@@ -178,6 +191,8 @@ def _decompress_chunks_v3(fin, fout, progress, total, max_output):
         if len(header) < _HEADER_V2.size:
             raise ValueError('corrupt file: truncated chunk header')
         chk, table_len, pad, flags = _HEADER_V2.unpack(header)
+        if flags & ~(_FLAG_RAW | _FLAG_END):
+            raise ValueError('corrupt file: unknown chunk flags')
         if flags & _FLAG_END:
             if flags & _FLAG_RAW or table_len or pad:
                 raise ValueError('corrupt file: malformed end marker')
@@ -211,6 +226,9 @@ def _decompress_chunks_v2(fin, fout, progress, total, max_output):
         if len(header) < _HEADER_V2.size:
             raise ValueError('corrupt file: truncated chunk header')
         chk, table_len, pad, flags = _HEADER_V2.unpack(header)
+        if flags & ~_FLAG_RAW:
+            # v2 has no END marker: the only legal flag bit is RAW.
+            raise ValueError('corrupt file: unknown chunk flags')
         if flags & _FLAG_RAW:
             raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
             original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
@@ -261,6 +279,11 @@ def compress_file(input_path, progress=None, overwrite=False):
     ``overwrite`` must be True to clobber an existing output file;
     otherwise a ``FileExistsError`` is raised, and a symlink at the
     output path is never followed.
+
+    If the input file changes while it is being read (concurrent writer,
+    truncation, replacement), an ``IOError`` is raised instead of writing
+    a torn archive that looks complete. The caller quarantines the partial
+    output through its normal failure path.
     """
     output_path = input_path + '.vzip'
     if not overwrite and os.path.lexists(output_path):
@@ -269,6 +292,7 @@ def compress_file(input_path, progress=None, overwrite=False):
             f'(pass overwrite=True to allow it)'
         )
     total = os.path.getsize(input_path)
+    fingerprint = _input_fingerprint(input_path)
     done = 0
     with open(input_path, 'rb') as fin, _output_writer(output_path, overwrite) as fout:
         fout.write(_MAGIC)
@@ -283,6 +307,11 @@ def compress_file(input_path, progress=None, overwrite=False):
         # End-of-stream marker: guarantees a truncated file can never
         # silently decompress to partial data.
         fout.write(_HEADER_V2.pack(0, 0, 0, _FLAG_END))
+    if done != total or _input_fingerprint(input_path) != fingerprint:
+        raise IOError(
+            f'input file changed during compression: refusing to write '
+            f'a torn archive for {input_path!r}'
+        )
     if progress is not None:
         progress(total, total)
     return output_path

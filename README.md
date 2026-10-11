@@ -99,7 +99,7 @@ files compress fine on modest hardware.
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
 | `vectorzip.spec` | PyInstaller spec for the standalone release binaries. |
-| `tests/test_compression.py` | 34 pytest round-trip / corruption / legacy-format / safety tests. |
+| `tests/test_compression.py` | 53 pytest round-trip / corruption / legacy-format / safety / concurrency tests (with `tests/test_audit2_concurrency.py`). |
 | `tests/fuzz_decompress.py` | Stdlib-only decompressor fuzzer (also runs in CI). |
 | `tests/benchmark.py` | Dev-only throughput benchmark harness. |
 | `docs/compression.md` | Algorithm and container-format documentation. |
@@ -107,9 +107,9 @@ files compress fine on modest hardware.
 ## Feature rundown
 
 ### Compression engine
-- **Completely lossless** — byte-identical round trips, verified by 34 unit
-  tests and tens of thousands of fuzz cases (24,767 recent round-trip fuzz
-  cases, 0 failures).
+- **Completely lossless** — byte-identical round trips, verified by 53 unit
+  tests and tens of thousands of fuzz cases (25,422 recent decompressor
+  fuzz cases, 0 failures).
 - **Fast on real data, instant on junk** — ~10 MB/s on compressible files;
   random/already-compressed data stores raw at ~800 MB/s and never balloons.
 - **Flat memory** — 64 KiB chunked processing; file size doesn't move the
@@ -128,6 +128,13 @@ files compress fine on modest hardware.
   truncated archive can never silently produce partial output.
 - **Chunk-length caps validated before allocation** — malformed headers can't
   trick the reader into giant allocations.
+- **Unknown chunk flags rejected** — a chunk carrying a reserved flag bit is
+  refused with `ValueError` instead of being misparsed (fail closed, not
+  forward-compatible-by-accident).
+- **Torn-input detection** — `compress_file` fingerprints the input (inode,
+  size, mtime) before and after the read; if anything changed it mid-job
+  (concurrent writer, truncation, replacement), it raises `IOError` instead
+  of writing a torn archive that looks complete.
 
 ### Safety hardening
 - **Outputs never overwrite by default** — compressing refuses to clobber an
@@ -148,6 +155,9 @@ files compress fine on modest hardware.
 - **Partial outputs quarantined** — a cancelled or failed CLI job renames the
   half-written file to `.partial` so it can never be mistaken for a good
   result (the GUI quarantines failed, cancelled, and out-of-memory jobs).
+  Quarantine only fires when the job actually wrote output: an overwrite
+  refusal leaves the pre-existing file untouched instead of renaming it
+  to `.partial`.
 
 ### Command line (`vzip`)
 - `vzip compress path/to/file` → `path/to/file.vzip`
@@ -171,8 +181,14 @@ files compress fine on modest hardware.
 - **Mode switch** — Compress / Decompress with one click.
 - **Custom output folder** — with browse and reset-to-default buttons.
 - **Overwrite protection** — an explicit checkbox; existing outputs are
-  skipped unless you opt in.
+  skipped unless you opt in. The output-folder move is atomic (no
+  check-then-move race), and jobs whose output name collides with another
+  job in the same batch are skipped up front so a later job can never
+  silently replace an earlier job's result.
 - **Cancel** — stops the run and quarantines partials.
+- **Graceful close** — closing the window mid-batch cancels the worker and
+  finishes the close once the thread has exited, instead of destroying a
+  running `QThread`.
 - Runs jobs on a worker `QThread`, so the interface stays responsive during
   long batches.
 
@@ -302,13 +318,17 @@ See [docs/compression.md](docs/compression.md).
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q        # 34/34 passing
+python -m pytest tests/ -q        # 53/53 passing
 ```
 
-- **Unit tests** (`tests/test_compression.py`) — 34 tests covering round
-  trips at every size from empty to multi-chunk, chunk/window boundary
-  conditions, byte-flip and truncation corruption, legacy v1/v2 archives,
-  overwrite-refusal and symlink safety, output caps, and cancel behavior.
+- **Unit tests** (`tests/test_compression.py`,
+  `tests/test_audit2_concurrency.py`) — 53 tests covering round trips at
+  every size from empty to multi-chunk, chunk/window boundary conditions,
+  byte-flip and truncation corruption, legacy v1/v2 archives,
+  overwrite-refusal and symlink safety, output caps, cancel behavior,
+  torn-input detection, unknown chunk flags, the GUI worker's atomic
+  no-clobber move, batch duplicate-output planning, and quarantine
+  semantics on overwrite refusal.
 - **Decompressor fuzzer** (`tests/fuzz_decompress.py`) — stdlib-only,
   byte-flips and truncates real archives; runs 5 minutes in CI on every
   push touching `src/` or `tests/`, plus weekly on a schedule.
