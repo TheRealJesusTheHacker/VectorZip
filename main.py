@@ -98,6 +98,10 @@ def main():
         print("Error: out of memory — the input file may be corrupt or " "a decompression bomb")
         sys.exit(1)
     except Exception as e:
+        # A corrupt archive fails mid-write, so the half-written output must
+        # be quarantined just like a cancelled job — otherwise it looks like
+        # a finished result.
+        _quarantine_partial(expected)
         print("Error: Operation failed - {}".format(e))
         sys.exit(1)
 

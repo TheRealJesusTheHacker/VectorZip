@@ -235,6 +235,9 @@ class JobWorker(QtCore.QObject):
                     self._quarantine_partial(path)
                     self.file_done.emit(path, False, "Out of memory — file may be corrupt", 0, 0)
                 except Exception:
+                    # A corrupt archive fails mid-write: quarantine the
+                    # half-written output so it can't look like a good result.
+                    self._quarantine_partial(path)
                     self.file_done.emit(
                         path, False, traceback.format_exc(limit=1).strip().splitlines()[-1], 0, 0
                     )
