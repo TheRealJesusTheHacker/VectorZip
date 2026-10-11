@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="vectorzip-py",
-    version="1.2.3",
+    version="1.2.4",
     description="A lossless, chunked-processing compression utility.",
     author="VectorZip Developer",
     packages=["vectorzip", "gui"],
