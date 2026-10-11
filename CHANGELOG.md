@@ -2,6 +2,18 @@
 
 All notable changes to VectorZip are documented here.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Lint/format enforcement in CI (ruff + black) with pinned versions and a
+  matching `pyproject.toml` config.
+- CLI compress → decompress → byte-compare round-trip as a CI job.
+- GitHub issue (bug/feature) and pull request templates.
+- Detailed README feature rundown with verification notes.
+
 ## [1.2.3] — 2026-10-10
 
 **The hardening release.** Two full security audits plus performance passes.
