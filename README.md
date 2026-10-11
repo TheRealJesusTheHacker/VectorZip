@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/TheRealJesusTheHacker/VectorZip)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](setup.py)
-[![Tests](https://img.shields.io/badge/tests-34%2F34_passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-53%2F53_passing-brightgreen)](tests/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#downloads)
 
 **VectorZip** is a *completely lossless* file compression tool built in pure
@@ -108,8 +108,8 @@ files compress fine on modest hardware.
 
 ### Compression engine
 - **Completely lossless** — byte-identical round trips, verified by 53 unit
-  tests and tens of thousands of fuzz cases (25,422 recent decompressor
-  fuzz cases, 0 failures).
+  tests and tens of thousands of fuzz cases per 5-minute CI run (0 unexpected
+  exceptions).
 - **Fast on real data, instant on junk** — ~10 MB/s on compressible files;
   random/already-compressed data stores raw at ~800 MB/s and never balloons.
 - **Flat memory** — 64 KiB chunked processing; file size doesn't move the
@@ -305,7 +305,7 @@ restored = decompress_file(out, progress=show, max_output_bytes=2 * 1024**3)
 
 ## File format
 
-`.vzip` files (v3, since 1.2.3) start with a `VZP3` magic; each 64 KiB chunk
+`.vzip` files (v3, since 1.2.2) start with a `VZP3` magic; each 64 KiB chunk
 carries a CRC32, a flags byte, and either the Huffman-packed LZ77 token
 stream or — when compression wouldn't shrink it — the raw chunk bytes.
 The stream ends with an end-of-stream marker chunk, so a truncated file
