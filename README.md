@@ -189,6 +189,8 @@ files compress fine on modest hardware.
 - **Graceful close** — closing the window mid-batch cancels the worker and
   finishes the close once the thread has exited, instead of destroying a
   running `QThread`.
+- **Remembers your setup** — window size, mode, output folder, and the
+  overwrite choice persist between runs (platform settings store).
 - Runs jobs on a worker `QThread`, so the interface stays responsive during
   long batches.
 

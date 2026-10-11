@@ -173,10 +173,10 @@ def _move_noclobber(src, dest, overwrite):
     """Move ``src`` to ``dest``.
 
     With ``overwrite=False`` the refusal is atomic: the destination is
-    claimed with a hard link (an ``O_EXCL``-claimed copy across
-    filesystems), so no check-then-move race can silently replace a file
-    that appeared in between. With ``overwrite=True`` the replacement is
-    a single atomic ``os.replace`` (which, unlike ``os.rename``, also
+    claimed with a hard link (an ``O_EXCL``-claimed copy when hard links
+    are unavailable), so no check-then-move race can silently replace a
+    file that appeared in between. With ``overwrite=True`` the replacement
+    is a single atomic ``os.replace`` (which, unlike ``os.rename``, also
     replaces on Windows). A symlink at ``dest`` is never followed.
     """
     if os.path.isdir(dest) and not os.path.islink(dest):
@@ -189,9 +189,12 @@ def _move_noclobber(src, dest, overwrite):
     except OSError as e:
         if e.errno == errno.EEXIST:
             raise FileExistsError(f'output exists: {os.path.basename(dest)}')
-        if e.errno != errno.EXDEV:
-            raise
-        # Cross-filesystem: claim dest atomically, then copy into it.
+        # The hard link failed for any other reason: cross-filesystem
+        # (POSIX EXDEV), Windows cross-volume (EINVAL there, not EXDEV),
+        # or a filesystem without hard-link support (exFAT, some network
+        # mounts). The link was only ever an optimization — the O_EXCL
+        # claim below is the actual no-clobber guarantee — so fall back
+        # to claiming dest atomically and copying into it.
         fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
         try:
             with os.fdopen(fd, 'wb') as fout, open(src, 'rb') as fin:
@@ -269,7 +272,11 @@ class JobWorker(QtCore.QObject):
         partial = _expected_output(path, self.mode)
         if os.path.exists(partial):
             try:
-                os.rename(partial, partial + ".partial")
+                # os.replace, not os.rename: a leftover .partial from an
+                # earlier cancelled run must not block this quarantine —
+                # otherwise the half-written output keeps its good-looking
+                # name. os.replace overwrites on Windows too.
+                os.replace(partial, partial + ".partial")
             except OSError:
                 pass
 
@@ -283,9 +290,13 @@ class JobWorker(QtCore.QObject):
                     in_size = os.path.getsize(path)
                     func = compress_file if self.mode == "compress" else decompress_file
                     out = func(path, progress=self._progress_cb(label), overwrite=self.overwrite)
-                    if self.out_dir and os.path.dirname(os.path.abspath(out)) != os.path.abspath(
-                        self.out_dir
-                    ):
+                    # normcase: on Windows C:\Data and c:\data are the same
+                    # directory — without this a case-only difference
+                    # triggers a bogus move of the file onto itself and a
+                    # false "Output exists" failure.
+                    if self.out_dir and os.path.normcase(
+                        os.path.dirname(os.path.abspath(out))
+                    ) != os.path.normcase(os.path.abspath(self.out_dir)):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
                         _move_noclobber(out, dest, self.overwrite)
                         out = dest
@@ -340,6 +351,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
 
         self._build_ui()
         self.setStyleSheet(STYLESHEET)
+        self._restore_settings()
         self._log("VectorZip ready — drop files in to compress or decompress.", "info")
 
     # -- UI construction ----------------------------------------------------
@@ -487,8 +499,16 @@ class VectorZipWindow(QtWidgets.QMainWindow):
 
     # -- Drag & drop --------------------------------------------------------
 
+    def _is_running(self):
+        return self._thread is not None and self._thread.isRunning()
+
     def eventFilter(self, obj, event):
         if obj is self.drop_zone:
+            # The Add/Remove/Clear/Mode controls are all disabled mid-run;
+            # the drop zone must be too, or dropped files sit "Queued" and
+            # never join the running batch — misleading.
+            if self._is_running():
+                return False
             if event.type() == QtCore.QEvent.Type.DragEnter:
                 if event.mimeData().hasUrls():
                     event.acceptProposedAction()
@@ -596,10 +616,38 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         if d:
             self.out_edit.setText(d)
 
+    # -- Settings persistence ---------------------------------------------------
+
+    def _restore_settings(self):
+        # main() sets the application/organization name, so a default
+        # QSettings lands in the platform store automatically.
+        s = QtCore.QSettings()
+        geom = s.value("geometry")
+        if geom is not None:
+            self.restoreGeometry(geom)
+        mode = s.value("mode")
+        if mode in ("Compress", "Decompress"):
+            # Don't fire _mode_changed (queue is empty anyway, but skip
+            # the "Mode switched" log line on every launch).
+            self.mode_combo.blockSignals(True)
+            self.mode_combo.setCurrentText(mode)
+            self.mode_combo.blockSignals(False)
+        self.overwrite_chk.setChecked(s.value("overwrite", False, type=bool))
+        out_dir = s.value("out_dir", "")
+        if out_dir:
+            self.out_edit.setText(out_dir)
+
+    def _save_settings(self):
+        s = QtCore.QSettings()
+        s.setValue("geometry", self.saveGeometry())
+        s.setValue("mode", self.mode_combo.currentText())
+        s.setValue("overwrite", self.overwrite_chk.isChecked())
+        s.setValue("out_dir", self.out_edit.text())
+
     # -- Run control ----------------------------------------------------------
 
     def _refresh_buttons(self):
-        running = self._thread is not None and self._thread.isRunning()
+        running = self._is_running()
         has_jobs = bool(self._jobs)
         self.start_btn.setEnabled(has_jobs and not running)
         self.cancel_btn.setEnabled(running)
@@ -668,13 +716,19 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         # Never destroy a running worker thread with the window: that is a
         # hard Qt crash ("QThread: Destroyed while thread is still running").
         # Cancel instead and finish the close once the thread has exited.
-        if self._thread is not None and self._thread.isRunning():
+        if self._is_running():
+            if self._closing:
+                # Close already requested and the cancel is in flight —
+                # just wait; don't log "Cancelling…" again per click.
+                event.ignore()
+                return
             self._log("Cancelling running jobs before exit…", "warn")
             if self._worker is not None:
                 self._worker.cancelled = True
             self._closing = True
             event.ignore()
             return
+        self._save_settings()
         event.accept()
 
     def _deferred_close(self):
