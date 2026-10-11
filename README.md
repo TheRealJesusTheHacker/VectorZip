@@ -343,3 +343,11 @@ Mozilla Public License 2.0 — see [LICENSE](LICENSE).
 All notable changes are documented in [CHANGELOG.md](CHANGELOG.md),
 following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 format.
+
+## Donations
+
+If this tool earned its keep, BTC is welcome:
+
+```
+bc1qvydns2fmyjzj55wzxq7ta28nxdhcmu9l9m6yg0
+```
