@@ -29,7 +29,10 @@ incompressible data (random bytes, already-compressed files) passes through
 at I/O speed instead of being expanded by the entropy coder.
 
 Decompression verifies the CRC32 of every chunk and raises ValueError
-on any truncation or mismatch.
+on any truncation or mismatch. Decoded chunks are additionally capped at
+128 KiB *during* LZ77 expansion (legit chunks are exactly one 64 KiB input
+chunk), so a malicious chunk cannot force a huge in-memory allocation
+before the checksum is verified.
 """
 
 import os
@@ -53,6 +56,11 @@ _FLAG_END = 0x80
 # encoded chunks are always smaller than the chunk they were made from.
 _MAX_RAW_LEN = 131072  # 128 KiB
 _MAX_ENCODED_LEN = 1048576  # 1 MiB
+# A decoded chunk is exactly the 64 KiB input chunk it was made from, so
+# anything past 128 KiB is a bomb: reject it *during* LZ77 expansion,
+# before a crafted chunk can force a multi-hundred-MiB allocation that the
+# total-output cap would only catch after the fact.
+_MAX_CHUNK_OUT = 131072  # 128 KiB
 _MAX_TABLE_LEN = 1048576  # 1 MiB (the u16 header already caps this at 64 KiB)
 _DEFAULT_MAX_OUTPUT = 8 * 1024**3  # 8 GiB total-output guard
 # Sampling heuristic: slices taken from the start/middle/end of a chunk.
@@ -184,7 +192,7 @@ def _decompress_chunks_v3(fin, fout, progress, total, max_output):
             table = deserialize_table(table_blob)
             encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
             encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-            original = lz77_decompress(huffman_decode(encoded, pad, table))
+            original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)
@@ -211,7 +219,7 @@ def _decompress_chunks_v2(fin, fout, progress, total, max_output):
             table = deserialize_table(table_blob)
             encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
             encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-            original = lz77_decompress(huffman_decode(encoded, pad, table))
+            original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)
@@ -234,7 +242,7 @@ def _decompress_chunks_v1(fin, fout, progress, total, max_output):
         table = deserialize_table(table_blob)
         encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
         encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-        original = lz77_decompress(huffman_decode(encoded, pad, table))
+        original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
         if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
             raise ValueError('corrupt file: checksum mismatch')
         fout.write(original)

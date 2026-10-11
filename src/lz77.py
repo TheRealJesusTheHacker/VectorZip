@@ -60,8 +60,14 @@ def lz77_compress(data):
     return bytes(result)
 
 
-def lz77_decompress(data):
-    """Decompress bytes produced by :func:`lz77_compress`. Lossless."""
+def lz77_decompress(data, max_out=None):
+    """Decompress bytes produced by :func:`lz77_compress`. Lossless.
+
+    ``max_out`` optionally caps the decoded output size in bytes; decoding
+    raises ``ValueError`` as soon as it is exceeded. The container reader
+    passes its per-chunk cap so a malicious chunk cannot force a huge
+    in-memory expansion before the checksum is verified.
+    """
     data = bytes(data)
     if len(data) % _TOKEN.size != 0:
         raise ValueError('corrupt LZ77 stream: truncated token')
@@ -80,4 +86,6 @@ def lz77_decompress(data):
             for k in range(length):
                 out.append(out[start + k])
             out.append(nxt)
+        if max_out is not None and len(out) > max_out:
+            raise ValueError('corrupt LZ77 stream: chunk output exceeds limit')
     return bytes(out)

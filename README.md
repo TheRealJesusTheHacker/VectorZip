@@ -138,13 +138,16 @@ files compress fine on modest hardware.
   path is never followed.
 - **Decompression-bomb defense** — total output is capped at 8 GiB by default
   (`--max-output-gb` to adjust, `--no-output-limit` to disable, or
-  `max_output_bytes=None` in the library).
+  `max_output_bytes=None` in the library), and every decoded chunk is
+  additionally capped at 128 KiB *during* LZ77 expansion (legit chunks are
+  exactly one 64 KiB input chunk), so a malicious chunk can't force a huge
+  in-memory allocation before its checksum is verified.
 - **Clean `MemoryError` handling** — a corrupt archive that would exhaust
   memory fails with a clear error in CLI and GUI instead of killing the
   worker thread with a raw traceback.
-- **Partial outputs quarantined** — cancelling a CLI or GUI job renames the
+- **Partial outputs quarantined** — a cancelled or failed CLI job renames the
   half-written file to `.partial` so it can never be mistaken for a good
-  result.
+  result (the GUI quarantines failed, cancelled, and out-of-memory jobs).
 
 ### Command line (`vzip`)
 - `vzip compress path/to/file` → `path/to/file.vzip`

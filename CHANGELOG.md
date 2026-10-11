@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Per-chunk decoded-output cap (128 KiB, enforced during LZ77 expansion):
+  a malicious chunk can no longer force a multi-hundred-MiB in-memory
+  expansion before its checksum is verified (the 8 GiB total-output cap
+  only caught it after the fact).
+- Partial outputs are now quarantined to `.partial` on *any* failed CLI or
+  GUI job, not just cancelled/out-of-memory ones — a corrupt archive can no
+  longer leave a half-written file that looks like a finished result.
+
 ### Added
 - Lint/format enforcement in CI (ruff + black) with pinned versions and a
   matching `pyproject.toml` config.

@@ -101,6 +101,19 @@ class TestLz77(unittest.TestCase):
         with self.assertRaises(ValueError):
             lz77_decompress(b'\x00\x00\x00')
 
+    def test_max_out_rejects_bomb(self):
+        # 1001 tokens, each expanding to 256 bytes -> ~256 KiB, past the
+        # 128 KiB per-chunk cap. Must raise instead of allocating it.
+        tokens = b'\x00\x00\x00\x41' + b'\x00\x01\xff\x00' * 1000
+        with self.assertRaises(ValueError):
+            lz77_decompress(tokens, max_out=131072)
+        # Without the cap it decodes fine (backwards compatible default).
+        self.assertEqual(len(lz77_decompress(tokens)), 1 + 1000 * 256)
+
+    def test_max_out_allows_legit_chunk(self):
+        data = bytes(range(256)) * 256  # 64 KiB, a full legit chunk
+        self.assertEqual(lz77_decompress(lz77_compress(data), max_out=131072), data)
+
 
 class TestHuffman(unittest.TestCase):
     def _rt(self, data):
@@ -174,6 +187,31 @@ class TestFormatV2Workhorse(unittest.TestCase):
             vp = self._compress(tmp, b'trailing junk test' * 500)
             with open(vp, 'ab') as f:
                 f.write(b'junk')
+            with self.assertRaises(ValueError):
+                decompress_file(vp)
+
+    def test_bomb_chunk_rejected_during_expansion(self):
+        # A single chunk whose LZ77 tokens expand past the 128 KiB
+        # per-chunk cap — with a *valid* CRC, so only the cap catches it.
+        import struct
+        import zlib
+        from src.huffman import serialize_table
+
+        tokens = b'\x00\x00\x00\x41' + b'\x00\x01\xff\x00' * 1000  # ~256 KiB
+        plain = lz77_decompress(tokens)  # no cap: attacker's intended output
+        self.assertGreater(len(plain), 131072)
+        chk = zlib.crc32(plain) & 0xFFFFFFFF
+        encoded, pad, table = huffman_encode(tokens)
+        blob = serialize_table(table)
+        with tempfile.TemporaryDirectory() as tmp:
+            vp = os.path.join(tmp, 'bomb.vzip')
+            with open(vp, 'wb') as f:
+                f.write(b'VZP3')
+                f.write(struct.pack('>IHBB', chk, len(blob), pad, 0))
+                f.write(blob)
+                f.write(struct.pack('>I', len(encoded)))
+                f.write(encoded)
+                f.write(struct.pack('>IHBB', 0, 0, 0, 0x80))  # END marker
             with self.assertRaises(ValueError):
                 decompress_file(vp)
 
