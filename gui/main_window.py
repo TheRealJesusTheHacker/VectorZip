@@ -3,6 +3,7 @@
 Batch compress/decompress with drag-and-drop, live progress,
 per-file statistics and a color-coded activity log.
 """
+
 import os
 import shutil
 import sys
@@ -29,7 +30,7 @@ PANEL_LIGHT = "#1c2431"
 BORDER = "#2a3444"
 TEXT = "#e8eef5"
 TEXT_DIM = "#93a1b5"
-ACCENT = "#38bdf8"      # electric cyan
+ACCENT = "#38bdf8"  # electric cyan
 ACCENT_DARK = "#0e7490"
 SUCCESS = "#4ade80"
 WARNING = "#fbbf24"
@@ -152,8 +153,9 @@ def fmt_bytes(num):
 # Background worker
 # ---------------------------------------------------------------------------
 
+
 class JobWorker(QtCore.QObject):
-    progress = QtCore.pyqtSignal(int, int, str)          # done, total, label
+    progress = QtCore.pyqtSignal(int, int, str)  # done, total, label
     file_done = QtCore.pyqtSignal(str, bool, str, int, int)  # path, ok, detail, in_size, out_size
     finished = QtCore.pyqtSignal()
 
@@ -184,7 +186,7 @@ class JobWorker(QtCore.QObject):
         if self.mode == "compress":
             return path + ".vzip"
         if path.endswith(".vzip"):
-            return path[:-len(".vzip")] + ".restored"
+            return path[: -len(".vzip")] + ".restored"
         return path + ".restored"
 
     def _quarantine_partial(self, path):
@@ -207,7 +209,9 @@ class JobWorker(QtCore.QObject):
                     in_size = os.path.getsize(path)
                     func = compress_file if self.mode == "compress" else decompress_file
                     out = func(path, progress=self._progress_cb(label), overwrite=self.overwrite)
-                    if self.out_dir and os.path.dirname(os.path.abspath(out)) != os.path.abspath(self.out_dir):
+                    if self.out_dir and os.path.dirname(os.path.abspath(out)) != os.path.abspath(
+                        self.out_dir
+                    ):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
                         if os.path.lexists(dest):
                             if not self.overwrite:
@@ -231,13 +235,17 @@ class JobWorker(QtCore.QObject):
                     self._quarantine_partial(path)
                     self.file_done.emit(path, False, "Out of memory — file may be corrupt", 0, 0)
                 except Exception:
-                    self.file_done.emit(path, False, traceback.format_exc(limit=1).strip().splitlines()[-1], 0, 0)
+                    self.file_done.emit(
+                        path, False, traceback.format_exc(limit=1).strip().splitlines()[-1], 0, 0
+                    )
         finally:
             self.finished.emit()
+
 
 # ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
+
 
 class VectorZipWindow(QtWidgets.QMainWindow):
     COL_FILE, COL_SIZE, COL_STATUS, COL_RESULT = range(4)
@@ -247,8 +255,8 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(f"VectorZip {__version__} — Lossless Compression")
         self.setMinimumSize(980, 720)
         self.resize(1080, 780)
-        self._jobs = []          # list of file paths in queue order
-        self._row_for = {}       # path -> row
+        self._jobs = []  # list of file paths in queue order
+        self._row_for = {}  # path -> row
         self._thread = None
         self._worker = None
         self._start_time = None
@@ -455,7 +463,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         font = QtGui.QFont("Consolas", 10)
         name_item.setFont(font)
         self.table.setItem(row, self.COL_FILE, name_item)
-        self.table.setItem(row, self.COL_SIZE, QtWidgets.QTableWidgetItem(fmt_bytes(os.path.getsize(path))))
+        self.table.setItem(
+            row, self.COL_SIZE, QtWidgets.QTableWidgetItem(fmt_bytes(os.path.getsize(path)))
+        )
         self.table.setItem(row, self.COL_STATUS, self._status_item("Queued", TEXT_DIM))
         self.table.setItem(row, self.COL_RESULT, QtWidgets.QTableWidgetItem("—"))
         self._jobs.append(path)
@@ -473,7 +483,11 @@ class VectorZipWindow(QtWidgets.QMainWindow):
 
     def _add_files(self):
         mode = self.mode_combo.currentText().lower()
-        filt = "VectorZip archives (*.vzip);;All files (*.*)" if mode == "decompress" else "All files (*.*)"
+        filt = (
+            "VectorZip archives (*.vzip);;All files (*.*)"
+            if mode == "decompress"
+            else "All files (*.*)"
+        )
         paths, _ = QtWidgets.QFileDialog.getOpenFileNames(self, "Add files", "", filt)
         if paths:
             self._enqueue(paths)
@@ -520,7 +534,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         mode = self.mode_combo.currentText().lower()
         out_dir = self.out_edit.text().strip() or None
         if out_dir and not os.path.isdir(out_dir):
-            QtWidgets.QMessageBox.warning(self, "Output folder", "That output folder does not exist.")
+            QtWidgets.QMessageBox.warning(
+                self, "Output folder", "That output folder does not exist."
+            )
             return
         # Pre-flight: drop jobs whose output already exists (unless overwrite)
         jobs = []
@@ -529,11 +545,20 @@ class VectorZipWindow(QtWidgets.QMainWindow):
                 out_probe = os.path.basename(p) + ".vzip"
             else:
                 base = os.path.basename(p)
-                out_probe = base[:-5] + ".restored" if base.endswith(".vzip") else base + ".restored"
+                out_probe = (
+                    base[:-5] + ".restored" if base.endswith(".vzip") else base + ".restored"
+                )
             dest_dir = out_dir or os.path.dirname(os.path.abspath(p))
-            if os.path.exists(os.path.join(dest_dir, out_probe)) and not self.overwrite_chk.isChecked():
-                self.table.setItem(self._row_for[p], self.COL_STATUS, self._status_item("Skipped", WARNING))
-                self.table.setItem(self._row_for[p], self.COL_RESULT, QtWidgets.QTableWidgetItem("Output exists"))
+            if (
+                os.path.exists(os.path.join(dest_dir, out_probe))
+                and not self.overwrite_chk.isChecked()
+            ):
+                self.table.setItem(
+                    self._row_for[p], self.COL_STATUS, self._status_item("Skipped", WARNING)
+                )
+                self.table.setItem(
+                    self._row_for[p], self.COL_RESULT, QtWidgets.QTableWidgetItem("Output exists")
+                )
                 self._log(f"Skipped (output exists): {out_probe}", "warn")
                 continue
             jobs.append(p)
@@ -542,7 +567,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
             self._refresh_buttons()
             return
         for p in jobs:
-            self.table.setItem(self._row_for[p], self.COL_STATUS, self._status_item("Queued", TEXT_DIM))
+            self.table.setItem(
+                self._row_for[p], self.COL_STATUS, self._status_item("Queued", TEXT_DIM)
+            )
 
         self._stats = {"files": 0, "in": 0, "out": 0}
         self._update_stats()
@@ -583,7 +610,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
             if in_size > 0:
                 saved = (1 - out_size / in_size) * 100
                 ratio = f"{saved:+.1f}%"
-                self.table.setItem(row, self.COL_RESULT, QtWidgets.QTableWidgetItem(f"{detail}  ({ratio})"))
+                self.table.setItem(
+                    row, self.COL_RESULT, QtWidgets.QTableWidgetItem(f"{detail}  ({ratio})")
+                )
             else:
                 self.table.setItem(row, self.COL_RESULT, QtWidgets.QTableWidgetItem(detail))
             self._stats["files"] += 1

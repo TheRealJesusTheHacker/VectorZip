@@ -34,15 +34,14 @@ def lz77_compress(data):
         best_len = 0
         best_dist = 0
         if i + _MIN_MATCH <= n:
-            seq = data[i:i + _MIN_MATCH]
+            seq = data[i : i + _MIN_MATCH]
             j = hash_chain.get(seq)
             if j is not None:
                 dist = i - j
                 if dist <= _WINDOW:
                     max_len = min(_MAX_MATCH, n - i)
                     match_len = _MIN_MATCH
-                    while (match_len < max_len
-                           and data[j + match_len] == data[i + match_len]):
+                    while match_len < max_len and data[j + match_len] == data[i + match_len]:
                         match_len += 1
                     if i + match_len < n:
                         best_len, best_dist = match_len, dist
@@ -53,8 +52,7 @@ def lz77_compress(data):
                     # else: too short once shrunk -> emit literal below
             hash_chain[seq] = i
         if best_len >= _MIN_MATCH:
-            result.extend(_TOKEN.pack(best_dist, best_len,
-                                      data[i + best_len]))
+            result.extend(_TOKEN.pack(best_dist, best_len, data[i + best_len]))
             i += best_len + 1
         else:
             result.extend(_TOKEN.pack(0, 0, data[i]))

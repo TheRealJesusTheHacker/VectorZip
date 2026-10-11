@@ -1,4 +1,5 @@
 """VectorZip command-line interface: compress/decompress files."""
+
 import os
 import sys
 import argparse
@@ -16,8 +17,10 @@ except ImportError:
 def _run_with_progress(label, func, path, **kwargs):
     total = os.path.getsize(path)
     with tqdm(total=total, unit='B', unit_scale=True, desc=label) as pbar:
+
         def _cb(done, _total):
             pbar.update(done - pbar.n)
+
         return func(path, progress=_cb, **kwargs)
 
 
@@ -25,7 +28,7 @@ def _expected_output(action, path):
     if action == 'compress':
         return path + '.vzip'
     if path.endswith('.vzip'):
-        return path[:-len('.vzip')] + '.restored'
+        return path[: -len('.vzip')] + '.restored'
     return path + '.restored'
 
 
@@ -43,15 +46,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="VectorZip: a lossless, chunked-processing compression utility."
     )
-    parser.add_argument("action", choices=["compress", "decompress"],
-                        help="Action to perform")
+    parser.add_argument("action", choices=["compress", "decompress"], help="Action to perform")
     parser.add_argument("file", help="Path to the target file")
-    parser.add_argument("--max-output-gb", type=float, default=None, metavar="GB",
-                        help="Decompression safety cap in GiB (default: 8)")
-    parser.add_argument("--no-output-limit", action="store_true",
-                        help="Disable the decompression output safety cap entirely")
-    parser.add_argument("--force", action="store_true",
-                        help="Overwrite existing output files")
+    parser.add_argument(
+        "--max-output-gb",
+        type=float,
+        default=None,
+        metavar="GB",
+        help="Decompression safety cap in GiB (default: 8)",
+    )
+    parser.add_argument(
+        "--no-output-limit",
+        action="store_true",
+        help="Disable the decompression output safety cap entirely",
+    )
+    parser.add_argument("--force", action="store_true", help="Overwrite existing output files")
 
     args = parser.parse_args()
 
@@ -65,17 +74,17 @@ def main():
     expected = _expected_output(args.action, args.file)
     try:
         if args.action == "compress":
-            output = _run_with_progress("Compressing", compress_file, args.file,
-                                        overwrite=args.force)
+            output = _run_with_progress(
+                "Compressing", compress_file, args.file, overwrite=args.force
+            )
             print("Success! Created: {}".format(output))
         else:
             kwargs = {"overwrite": args.force}
             if args.no_output_limit:
                 kwargs["max_output_bytes"] = None
             elif args.max_output_gb is not None:
-                kwargs["max_output_bytes"] = int(args.max_output_gb * 1024 ** 3)
-            output = _run_with_progress("Decompressing", decompress_file,
-                                        args.file, **kwargs)
+                kwargs["max_output_bytes"] = int(args.max_output_gb * 1024**3)
+            output = _run_with_progress("Decompressing", decompress_file, args.file, **kwargs)
             print("Success! Extracted: {}".format(output))
     except KeyboardInterrupt:
         _quarantine_partial(expected)
@@ -86,8 +95,7 @@ def main():
         # its own handler — otherwise a decompression bomb kills the CLI
         # with a raw traceback instead of a clean error.
         _quarantine_partial(expected)
-        print("Error: out of memory — the input file may be corrupt or "
-              "a decompression bomb")
+        print("Error: out of memory — the input file may be corrupt or " "a decompression bomb")
         sys.exit(1)
     except Exception as e:
         print("Error: Operation failed - {}".format(e))

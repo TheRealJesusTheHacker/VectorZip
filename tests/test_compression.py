@@ -126,6 +126,7 @@ class TestHuffman(unittest.TestCase):
 
     def test_table_serialization_roundtrip(self):
         from src.huffman import serialize_table, deserialize_table
+
         _, _, table = huffman_encode(bytes(range(256)) * 10)
         self.assertEqual(deserialize_table(serialize_table(table)), table)
 
@@ -144,7 +145,6 @@ class TestFormatV2Workhorse(unittest.TestCase):
         return compress_file(src)
 
     def test_v2_magic_present(self):
-        import struct
         with tempfile.TemporaryDirectory() as tmp:
             vp = self._compress(tmp, b'hello world' * 1000)
             with open(vp, 'rb') as f:
@@ -154,6 +154,7 @@ class TestFormatV2Workhorse(unittest.TestCase):
         # Regression: a v2 file cut exactly at a chunk boundary used to
         # silently decompress to partial data. v3 must raise.
         import random
+
         random.seed(7)
         data = b'chunk-boundary test data. ' * 8000  # > 1 chunk
         with tempfile.TemporaryDirectory() as tmp:
@@ -181,6 +182,7 @@ class TestFormatV2Workhorse(unittest.TestCase):
         import struct
         import zlib
         from src.huffman import serialize_table
+
         chunk = b'v2 format still works! ' * 500
         chk = zlib.crc32(chunk) & 0xFFFFFFFF
         lz_data = lz77_compress(chunk)
@@ -216,9 +218,9 @@ class TestFormatV2Workhorse(unittest.TestCase):
     def test_mixed_chunks_roundtrip(self):
         # One compressible chunk + one random chunk in the same file.
         import random
+
         random.seed(99)
-        data = (b'ABCD' * 20000 +
-                bytes(random.getrandbits(8) for _ in range(70000)))
+        data = b'ABCD' * 20000 + bytes(random.getrandbits(8) for _ in range(70000))
         with tempfile.TemporaryDirectory() as tmp:
             vp = self._compress(tmp, data)
             restored = decompress_file(vp)
@@ -230,6 +232,7 @@ class TestFormatV2Workhorse(unittest.TestCase):
         import struct
         import zlib
         from src.huffman import serialize_table
+
         chunk = b'legacy format still works! ' * 500
         chk = zlib.crc32(chunk) & 0xFFFFFFFF
         lz_data = lz77_compress(chunk)
@@ -251,6 +254,7 @@ class TestFormatV2Workhorse(unittest.TestCase):
         import struct
         import zlib
         from src.huffman import serialize_table
+
         chunk = os.urandom(5000)
         chk = zlib.crc32(chunk) & 0xFFFFFFFF
         lz_data = lz77_compress(chunk)

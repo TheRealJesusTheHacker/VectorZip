@@ -1,0 +1,21 @@
+# Shared configuration for linting and formatting.
+#
+# House style this config enforces: 4-space indent, single quotes (black's
+# string normalization is OFF), ~100-column lines. The codebase was written
+# in this style; the config below codifies it instead of rewriting it.
+
+[tool.black]
+line-length = 100
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 100
+# Minimum supported interpreter (setup.py python_requires='>=3.8')
+target-version = "py38"
+
+[tool.ruff.lint]
+# Conservative set: syntax/parse errors (E4/E9), core style (E7),
+# and pyflakes (F). Deliberately NOT enabling isort/pyupgrade/etc.:
+# the codebase uses .format() and hand-ordered imports by authorial
+# choice, and lint should not force a stylistic rewrite.
+select = ["E4", "E7", "E9", "F"]

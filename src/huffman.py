@@ -1,4 +1,5 @@
 """Huffman entropy coding plus table (de)serialization for the file format."""
+
 import heapq
 import struct
 from collections import Counter
@@ -116,12 +117,12 @@ def deserialize_table(buf):
     while i < n:
         if i + 2 > n:
             raise ValueError('corrupt Huffman table: truncated entry')
-        symbol, bitlen = struct.unpack('>BB', buf[i:i + 2])
+        symbol, bitlen = struct.unpack('>BB', buf[i : i + 2])
         i += 2
         nbytes = (bitlen + 7) // 8
         if i + nbytes > n:
             raise ValueError('corrupt Huffman table: truncated code')
-        val = int.from_bytes(buf[i:i + nbytes], 'big')
+        val = int.from_bytes(buf[i : i + nbytes], 'big')
         i += nbytes
         table[symbol] = bin(val)[2:].zfill(bitlen) if bitlen else ''
     return table

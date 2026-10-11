@@ -31,30 +31,30 @@ at I/O speed instead of being expanded by the entropy coder.
 Decompression verifies the CRC32 of every chunk and raises ValueError
 on any truncation or mismatch.
 """
+
 import os
 import struct
 import zlib
 
 from .lz77 import lz77_compress, lz77_decompress
-from .huffman import (huffman_encode, huffman_decode,
-                      serialize_table, deserialize_table)
+from .huffman import huffman_encode, huffman_decode, serialize_table, deserialize_table
 
 _CHUNK = 65536
 _MAGIC = b'VZP3'
 _MAGIC_V2 = b'VZP2'
 _HEADER_V2 = struct.Struct('>IHBB')  # crc32, table_len, pad_bits, flags
-_HEADER_V1 = struct.Struct('>IHB')   # crc32, table_len, pad_bits (no flags)
-_DATA_HEADER = struct.Struct('>I')   # encoded_len / raw_len
+_HEADER_V1 = struct.Struct('>IHB')  # crc32, table_len, pad_bits (no flags)
+_DATA_HEADER = struct.Struct('>I')  # encoded_len / raw_len
 _FLAG_RAW = 0x01
 _FLAG_END = 0x80
 # Decompression-bomb hardening. The lengths below come from the file and
 # are attacker-controlled, so every read is capped *before* allocating.
 # Legit raw chunks are never larger than one input chunk (64 KiB); legit
 # encoded chunks are always smaller than the chunk they were made from.
-_MAX_RAW_LEN = 131072        # 128 KiB
-_MAX_ENCODED_LEN = 1048576   # 1 MiB
-_MAX_TABLE_LEN = 1048576     # 1 MiB (the u16 header already caps this at 64 KiB)
-_DEFAULT_MAX_OUTPUT = 8 * 1024 ** 3  # 8 GiB total-output guard
+_MAX_RAW_LEN = 131072  # 128 KiB
+_MAX_ENCODED_LEN = 1048576  # 1 MiB
+_MAX_TABLE_LEN = 1048576  # 1 MiB (the u16 header already caps this at 64 KiB)
+_DEFAULT_MAX_OUTPUT = 8 * 1024**3  # 8 GiB total-output guard
 # Sampling heuristic: slices taken from the start/middle/end of a chunk.
 # Random (incompressible) data shows ~all 256 byte values in a few KiB;
 # text/code/binary show far fewer. Above this many distinct values we
@@ -72,7 +72,7 @@ def _looks_incompressible(chunk):
     step = (n - _SAMPLE_EACH) // (_SAMPLE_SLICES - 1) if _SAMPLE_SLICES > 1 else 0
     seen = set()
     for s in range(_SAMPLE_SLICES):
-        seen.update(chunk[s * step:s * step + _SAMPLE_EACH])
+        seen.update(chunk[s * step : s * step + _SAMPLE_EACH])
         if len(seen) > _SAMPLE_DISTINCT_LIMIT:
             return True
     return False
@@ -138,7 +138,8 @@ def _check_output_limit(done, max_output):
         raise ValueError(
             f'decompressed output exceeds the safety cap of {_format_cap(max_output)} '
             f'(possible decompression bomb); use --max-output-gb or '
-            f'--no-output-limit to override')
+            f'--no-output-limit to override'
+        )
 
 
 def _open_new_output(path):
@@ -165,8 +166,7 @@ def _decompress_chunks_v3(fin, fout, progress, total, max_output):
     while True:
         header = fin.read(_HEADER_V2.size)
         if not header:
-            raise ValueError('corrupt file: truncated file '
-                             '(missing end-of-stream marker)')
+            raise ValueError('corrupt file: truncated file ' '(missing end-of-stream marker)')
         if len(header) < _HEADER_V2.size:
             raise ValueError('corrupt file: truncated chunk header')
         chk, table_len, pad, flags = _HEADER_V2.unpack(header)
@@ -258,7 +258,8 @@ def compress_file(input_path, progress=None, overwrite=False):
     if not overwrite and os.path.lexists(output_path):
         raise FileExistsError(
             f'refusing to overwrite existing output: {output_path} '
-            f'(pass overwrite=True to allow it)')
+            f'(pass overwrite=True to allow it)'
+        )
     total = os.path.getsize(input_path)
     done = 0
     with open(input_path, 'rb') as fin, _output_writer(output_path, overwrite) as fout:
@@ -279,8 +280,9 @@ def compress_file(input_path, progress=None, overwrite=False):
     return output_path
 
 
-def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUTPUT,
-                    overwrite=False):
+def decompress_file(
+    input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUTPUT, overwrite=False
+):
     """Decompress a ``.vzip`` file; returns the restored file path.
 
     Reads format v3 (magic ``VZP3``), v2 (magic ``VZP2``), and legacy
@@ -296,7 +298,7 @@ def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUT
     output path is never followed.
     """
     if input_path.endswith('.vzip'):
-        output_path = input_path[:-len('.vzip')] + '.restored'
+        output_path = input_path[: -len('.vzip')] + '.restored'
     else:
         output_path = input_path + '.restored'
     if os.path.abspath(output_path) == os.path.abspath(input_path):
@@ -304,7 +306,8 @@ def decompress_file(input_path, progress=None, max_output_bytes=_DEFAULT_MAX_OUT
     if not overwrite and os.path.lexists(output_path):
         raise FileExistsError(
             f'refusing to overwrite existing output: {output_path} '
-            f'(pass overwrite=True to allow it)')
+            f'(pass overwrite=True to allow it)'
+        )
     if max_output_bytes is None:
         max_output_bytes = float('inf')
     total = os.path.getsize(input_path)

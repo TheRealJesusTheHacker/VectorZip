@@ -1,4 +1,5 @@
 """VectorZip desktop GUI entry point."""
+
 import os
 import sys
 

@@ -137,12 +137,14 @@ def run_case(blob, tmpdir, case_timeout):
 
 def main():
     parser = argparse.ArgumentParser(description="Fuzz VectorZip's decompressor.")
-    parser.add_argument("--seconds", type=float, default=300,
-                        help="total fuzzing time budget")
-    parser.add_argument("--seed", type=int, default=0,
-                        help="PRNG seed for reproducibility")
-    parser.add_argument("--case-timeout", type=float, default=10,
-                        help="per-case wall-clock timeout in seconds (SIGALRM; Unix only)")
+    parser.add_argument("--seconds", type=float, default=300, help="total fuzzing time budget")
+    parser.add_argument("--seed", type=int, default=0, help="PRNG seed for reproducibility")
+    parser.add_argument(
+        "--case-timeout",
+        type=float,
+        default=10,
+        help="per-case wall-clock timeout in seconds (SIGALRM; Unix only)",
+    )
     args = parser.parse_args()
     rng = random.Random(args.seed)
 
@@ -173,13 +175,17 @@ def main():
                 if isinstance(result, Exception):
                     traceback.print_exception(result)
             if i % 500 == 0:
-                print(f"  ... {i} cases ({counts['ok']} ok, "
-                      f"{counts['expected']} rejected, {len(failures)} failures)",
-                      flush=True)
+                print(
+                    f"  ... {i} cases ({counts['ok']} ok, "
+                    f"{counts['expected']} rejected, {len(failures)} failures)",
+                    flush=True,
+                )
 
-        print(f"\ndone: {i} cases — {counts['ok']} ok, "
-              f"{counts['expected']} cleanly rejected, {len(failures)} failures",
-              flush=True)
+        print(
+            f"\ndone: {i} cases — {counts['ok']} ok, "
+            f"{counts['expected']} cleanly rejected, {len(failures)} failures",
+            flush=True,
+        )
         if failures:
             print(f"repro inputs saved under {fail_dir}/", flush=True)
             return 1
