@@ -246,8 +246,8 @@ No Python required — grab the standalone app:
 
 | Platform | Download |
 |----------|----------|
-| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.3/VectorZip.exe) |
-| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.3/VectorZip) |
+| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/VectorZip.exe) |
+| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/VectorZip) |
 
 (Screenshots: none published — the GUI ships in the binaries above and in
 `gui/`.)
@@ -266,7 +266,7 @@ Get-FileHash VectorZip.exe -Algorithm SHA256
 sha256sum -c SHA256SUMS-linux.txt
 ```
 
-Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.3/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.3/SHA256SUMS-linux.txt)
+Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-linux.txt)
 
 ## Usage
 
