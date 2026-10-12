@@ -37,6 +37,7 @@ chunk), so a malicious chunk cannot force a huge in-memory allocation
 before the checksum is verified.
 """
 
+import errno
 import os
 import struct
 import zlib
@@ -166,7 +167,32 @@ def _open_new_output(path):
 
 
 def _output_writer(path, overwrite):
-    return open(path, 'wb') if overwrite else _open_new_output(path)
+    return _open_overwrite_output(path) if overwrite else _open_new_output(path)
+
+
+def _open_overwrite_output(path):
+    """Open ``path`` for writing, clobbering it if it is a real file.
+
+    ``O_TRUNC`` gives ``--force``/``overwrite=True`` its plain clobber
+    semantics for real files, while ``O_NOFOLLOW`` (where the platform
+    provides it) stops a pre-planted symlink from redirecting the write:
+    ``evil.restored -> victim.txt`` raises ``OSError`` (ELOOP) instead of
+    silently overwriting ``victim.txt``. A missing file is created as
+    usual, so real-file behaviour is unchanged.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags |= getattr(os, 'O_NOFOLLOW', 0)
+    try:
+        fd = os.open(path, flags, 0o666)
+    except OSError as e:
+        if e.errno == errno.ELOOP:
+            raise OSError(
+                errno.ELOOP,
+                f'refusing to write through symlink at output path: {path} '
+                f'(aborting to avoid clobbering the link target)',
+            )
+        raise
+    return os.fdopen(fd, 'wb')
 
 
 def _input_fingerprint(path):
@@ -277,8 +303,9 @@ def compress_file(input_path, progress=None, overwrite=False):
     invoked after each chunk.
 
     ``overwrite`` must be True to clobber an existing output file;
-    otherwise a ``FileExistsError`` is raised, and a symlink at the
-    output path is never followed.
+    otherwise a ``FileExistsError`` is raised. A symlink at the output
+    path is never followed, on either path: non-overwrite raises
+    ``FileExistsError``, overwrite aborts with ``OSError`` (ELOOP).
 
     If the input file changes while it is being read (concurrent writer,
     truncation, replacement), an ``IOError`` is raised instead of writing
@@ -331,8 +358,9 @@ def decompress_file(
     to disable.
 
     ``overwrite`` must be True to clobber an existing output file;
-    otherwise a ``FileExistsError`` is raised, and a symlink at the
-    output path is never followed.
+    otherwise a ``FileExistsError`` is raised. A symlink at the output
+    path is never followed, on either path: non-overwrite raises
+    ``FileExistsError``, overwrite aborts with ``OSError`` (ELOOP).
     """
     if input_path.endswith('.vzip'):
         output_path = input_path[: -len('.vzip')] + '.restored'
