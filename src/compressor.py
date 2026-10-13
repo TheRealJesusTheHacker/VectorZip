@@ -248,6 +248,17 @@ def _decompress_chunks(fin, fout, progress, total, max_output, header, require_e
         else:
             table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
             table = deserialize_table(table_blob)
+            # A coded chunk the encoder could never write: pad_bits is the
+            # padding inside the final encoded byte, so it is 0..7 by
+            # construction, and a coded chunk always carries a non-empty
+            # table (its bitstream is non-empty). Anything else is
+            # malformed — an empty table in particular would make the
+            # decoder skip the chunk's payload bytes without decoding
+            # them, with only the CRC of b'' to satisfy.
+            if pad > 7:
+                raise ValueError('corrupt file: invalid pad bits')
+            if not table:
+                raise ValueError('corrupt file: empty Huffman table')
             encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
             encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
             original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)

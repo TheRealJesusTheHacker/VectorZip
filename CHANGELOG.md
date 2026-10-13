@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- The container reader now rejects two coded-chunk shapes the encoder
+  could never have written: a chunk whose Huffman table is empty (its
+  payload bytes were previously skipped undecoded, satisfying only the
+  CRC32 of empty input) and `pad_bits` greater than 7 (padding lives
+  inside the final encoded byte, so 0–7 are the only legal values).
+  Both fail with `ValueError` like other malformed chunks. No archive
+  produced by any released version is affected — every writer emits
+  coded chunks only for non-empty input (non-empty table) and computes
+  `pad_bits` as `(8 - nbits % 8) % 8`.
+
+### Fixed
+- CLI: `--max-output-gb` values that are NaN, infinite, or too large
+  to convert to a byte count now fail argument validation (exit 2)
+  instead of escaping it and surfacing as a mid-operation error.
+
 ### Performance
 - `lz77_decompress` copies matches with slice/repeat operations and
   iterates tokens with `struct.iter_unpack` instead of appending byte by
