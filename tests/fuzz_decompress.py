@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Fuzz VectorZip's decompressor using only the standard library.
 
-Builds a seed corpus of valid .vzip files, then feeds mutated / truncated /
-random bytes into ``decompress_file`` and asserts that:
+Builds a seed corpus of valid archives in all three format versions
+(v3 as written today, v2 by re-magic'ing a v3 stream minus its END
+marker, v1 hand-built per the original format), then feeds mutated /
+truncated / random bytes into ``decompress_file`` and asserts that:
 
   * no exception other than ValueError / MemoryError escapes, and
   * no single case hangs (per-case wall-clock timeout via SIGALRM on Unix).
@@ -25,6 +27,8 @@ import traceback
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from src.compressor import compress_file, decompress_file  # noqa: E402
+from src.huffman import huffman_encode, serialize_table  # noqa: E402
+from src.lz77 import lz77_compress  # noqa: E402
 
 # Small output cap keeps adversarial cases fast. The cap logic under test is
 # the same code path as the 8 GiB default.
@@ -57,8 +61,40 @@ def _disarm():
         signal.alarm(0)
 
 
+def _v3_to_v2(blob):
+    """A v3 stream minus its END marker, re-magic'd, is a genuine v2
+    file: the chunk writer is the v2 workhorse. ``None`` if the blob
+    does not have the expected shape."""
+    import struct
+
+    if blob[:4] != b"VZP3" or blob[-8:] != struct.pack(">IHBB", 0, 0, 0, 0x80):
+        return None
+    return b"VZP2" + blob[4:-8]
+
+
+def _make_v1(payload):
+    """Hand-build a format-v1 archive (no magic, 7-byte headers, coded
+    chunks only) from the same primitives the current format uses."""
+    import struct
+    import zlib
+
+    out = bytearray()
+    for off in range(0, len(payload), 65536):
+        chunk = payload[off : off + 65536]
+        chk = zlib.crc32(chunk) & 0xFFFFFFFF
+        enc, pad, table = huffman_encode(lz77_compress(chunk))
+        tbl = serialize_table(table)
+        out += struct.pack(">IHB", chk, len(tbl), pad)
+        out += tbl
+        out += struct.pack(">I", len(enc))
+        out += enc
+    return bytes(out)
+
+
 def build_corpus(tmpdir, rng):
-    """Compress sample payloads; return the resulting .vzip blobs."""
+    """Compress sample payloads; return valid archive blobs in all
+    three format versions (v1/v2 parse paths need fuzz coverage too —
+    mutations otherwise only reach them via a smashed v3 magic)."""
     payloads = [
         b"",
         b"\x00" * 4096,
@@ -75,7 +111,12 @@ def build_corpus(tmpdir, rng):
         try:
             out = compress_file(src, overwrite=True)
             with open(out, "rb") as f:
-                seeds.append(f.read())
+                blob = f.read()
+            seeds.append(blob)
+            v2 = _v3_to_v2(blob)
+            if v2 is not None:
+                seeds.append(v2)
+            seeds.append(_make_v1(payload))
         except Exception as exc:  # noqa: BLE001 - corpus build must not die quietly
             print(f"WARNING: seed {n} failed to compress: {exc!r}")
     return seeds
