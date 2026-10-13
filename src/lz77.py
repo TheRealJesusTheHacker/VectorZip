@@ -72,8 +72,7 @@ def lz77_decompress(data, max_out=None):
     if len(data) % _TOKEN.size != 0:
         raise ValueError('corrupt LZ77 stream: truncated token')
     out = bytearray()
-    for off in range(0, len(data), _TOKEN.size):
-        dist, length, nxt = _TOKEN.unpack_from(data, off)
+    for dist, length, nxt in _TOKEN.iter_unpack(data):
         if dist == 0:
             if length != 0:
                 raise ValueError('corrupt LZ77 stream: bad literal token')
@@ -82,9 +81,17 @@ def lz77_decompress(data, max_out=None):
             if dist > len(out) or length < _MIN_MATCH:
                 raise ValueError('corrupt LZ77 stream: bad match token')
             start = len(out) - dist
-            # byte-by-byte so overlapping matches copy correctly
-            for k in range(length):
-                out.append(out[start + k])
+            if length <= dist:
+                # Non-overlapping copy: one slice copy at C speed instead
+                # of a byte-by-byte append loop.
+                out += out[start : start + length]
+            else:
+                # Overlapping copy: the source grows as bytes are
+                # appended, so the copied run is exactly the periodic
+                # repetition of the ``dist`` bytes that end the output —
+                # which is what the old byte-by-byte loop produced.
+                pat = out[start:]
+                out += (pat * (length // dist + 1))[:length]
             out.append(nxt)
         if max_out is not None and len(out) > max_out:
             raise ValueError('corrupt LZ77 stream: chunk output exceeds limit')
