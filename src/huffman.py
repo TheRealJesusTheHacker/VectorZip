@@ -110,8 +110,25 @@ def serialize_table(table):
     return bytes(buf)
 
 
+# Deepest code the encoder can legitimately produce. Huffman depth is
+# bounded by the Fibonacci growth of symbol weights (a depth-d code needs
+# total weight >= Fib(d+2)), so a 64 KiB chunk tops out near 26 bits and
+# even a GiB-scale in-memory stream near 45. 64 leaves wide margin while
+# keeping a hostile table from forcing a decode tree hundreds of levels
+# deep out of a 64 KiB blob.
+_MAX_CODE_BITS = 64
+
+
 def deserialize_table(buf):
-    """Inverse of :func:`serialize_table`."""
+    """Inverse of :func:`serialize_table`.
+
+    Strict on purpose: the table bytes come straight from the (possibly
+    hostile) input file, so entries :func:`serialize_table` could never
+    have written — a zero-length code, a code longer than
+    ``_MAX_CODE_BITS``, a code value that does not fit in its declared
+    bit length, or a symbol listed twice — are rejected with
+    ``ValueError`` instead of being silently reinterpreted.
+    """
     table = {}
     i, n = 0, len(buf)
     while i < n:
@@ -119,10 +136,16 @@ def deserialize_table(buf):
             raise ValueError('corrupt Huffman table: truncated entry')
         symbol, bitlen = struct.unpack('>BB', buf[i : i + 2])
         i += 2
+        if bitlen == 0 or bitlen > _MAX_CODE_BITS:
+            raise ValueError('corrupt Huffman table: invalid code length')
         nbytes = (bitlen + 7) // 8
         if i + nbytes > n:
             raise ValueError('corrupt Huffman table: truncated code')
         val = int.from_bytes(buf[i : i + nbytes], 'big')
         i += nbytes
-        table[symbol] = bin(val)[2:].zfill(bitlen) if bitlen else ''
+        if val >= (1 << bitlen):
+            raise ValueError('corrupt Huffman table: code exceeds its bit length')
+        if symbol in table:
+            raise ValueError('corrupt Huffman table: duplicate symbol')
+        table[symbol] = bin(val)[2:].zfill(bitlen)
     return table

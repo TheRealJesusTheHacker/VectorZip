@@ -5,6 +5,20 @@ All notable changes to VectorZip are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- `deserialize_table` now rejects Huffman table entries the encoder could
+  never have written, instead of silently reinterpreting them: zero-length
+  codes, codes longer than 64 bits (a real 64 KiB chunk tops out near 26;
+  the cap only excludes hand-crafted tables), code values that overflow
+  their declared bit length, and symbols listed twice. The table is parsed
+  from the untrusted input file before any checksum runs, so malformed
+  tables now fail fast with `ValueError` rather than building a decode
+  tree the format never intended. No legitimately produced archive is
+  affected — regression tests cover both the rejections and the
+  boundary (a 64-bit code is still accepted).
+
 ## [1.2.4] — 2026-10-11
 
 ### Security
