@@ -1,5 +1,6 @@
 """VectorZip command-line interface: compress/decompress files."""
 
+import math
 import os
 import sys
 import argparse
@@ -66,7 +67,13 @@ def main():
         print("Error: file not found: {}".format(args.file))
         sys.exit(1)
 
-    if args.max_output_gb is not None and args.max_output_gb <= 0:
+    if args.max_output_gb is not None and (
+        not args.max_output_gb > 0 or not math.isfinite(args.max_output_gb * 1024**3)
+    ):
+        # `not x > 0` also catches NaN (every NaN comparison is false);
+        # the product check catches infinities and values so large the
+        # byte count overflows to inf, both of which used to escape
+        # validation and surface as a misleading mid-operation error.
         parser.error("--max-output-gb must be positive")
 
     expected = _expected_output(args.action, args.file)
