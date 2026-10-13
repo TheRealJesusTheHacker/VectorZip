@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- `lz77_decompress` copies matches with slice/repeat operations and
+  iterates tokens with `struct.iter_unpack` instead of appending byte by
+  byte — roughly 1.6–2.3× faster depending on the data.
+- `huffman_decode` resolves most symbols through a 9-bit lookup table
+  over a bit accumulator (long codes and stream tails still walk the
+  decode tree, so output and error behavior are unchanged) — roughly
+  1.4–1.9× faster. `huffman_encode` uses list-indexed code tables for a
+  small gain. Compressed output is byte-for-byte identical to before:
+  the on-disk format and the encoder's decisions did not change, and
+  archives written by earlier versions decompress exactly as before.
+
+### Changed
+- The three per-version decompression chunk loops (v1/v2/v3) are one
+  parameterized loop with the same validation order and error messages,
+  and the CLI/GUI output-path naming rule now lives in one place
+  (`src.compressor.expected_output_path`).
+
 ### Security
 - `deserialize_table` now rejects Huffman table entries the encoder could
   never have written, instead of silently reinterpreting them: zero-length
