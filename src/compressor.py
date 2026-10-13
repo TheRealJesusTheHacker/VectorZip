@@ -206,94 +206,88 @@ def _input_fingerprint(path):
     return (st.st_ino, st.st_size, st.st_mtime_ns)
 
 
+def _decompress_chunks(fin, fout, progress, total, max_output, header, require_end):
+    """Shared chunk loop for format v1/v2/v3.
+
+    ``header`` is the chunk header struct (v1 has no flags byte; its
+    chunks are always Huffman-coded). ``require_end`` is v3-only: the
+    stream must terminate with an explicit END marker chunk, and EOF
+    without it means the file was truncated. Per-version validation
+    order and error messages are preserved exactly.
+    """
+    is_v1 = header is _HEADER_V1
+    done = 0
+    while True:
+        raw_header = fin.read(header.size)
+        if not raw_header:
+            if require_end:
+                raise ValueError('corrupt file: truncated file (missing end-of-stream marker)')
+            break
+        if len(raw_header) < header.size:
+            raise ValueError('corrupt file: truncated chunk header')
+        if is_v1:
+            chk, table_len, pad = header.unpack(raw_header)
+            flags = 0
+        else:
+            chk, table_len, pad, flags = header.unpack(raw_header)
+            if require_end:
+                if flags & ~(_FLAG_RAW | _FLAG_END):
+                    raise ValueError('corrupt file: unknown chunk flags')
+                if flags & _FLAG_END:
+                    if flags & _FLAG_RAW or table_len or pad:
+                        raise ValueError('corrupt file: malformed end marker')
+                    if fin.read(1):
+                        raise ValueError('corrupt file: data after end marker')
+                    break
+            elif flags & ~_FLAG_RAW:
+                # v2 has no END marker: the only legal flag bit is RAW.
+                raise ValueError('corrupt file: unknown chunk flags')
+        if flags & _FLAG_RAW:
+            raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
+            original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
+        else:
+            table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
+            table = deserialize_table(table_blob)
+            encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
+            encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
+            original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
+        if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
+            raise ValueError('corrupt file: checksum mismatch')
+        fout.write(original)
+        done += len(original)
+        _check_output_limit(done, max_output)
+        if progress is not None:
+            progress(done, total)
+
+
 def _decompress_chunks_v3(fin, fout, progress, total, max_output):
     """v3 chunk loop: identical to v2, but the stream must end with an
     explicit END marker chunk. EOF without it means a truncated file."""
-    done = 0
-    while True:
-        header = fin.read(_HEADER_V2.size)
-        if not header:
-            raise ValueError('corrupt file: truncated file ' '(missing end-of-stream marker)')
-        if len(header) < _HEADER_V2.size:
-            raise ValueError('corrupt file: truncated chunk header')
-        chk, table_len, pad, flags = _HEADER_V2.unpack(header)
-        if flags & ~(_FLAG_RAW | _FLAG_END):
-            raise ValueError('corrupt file: unknown chunk flags')
-        if flags & _FLAG_END:
-            if flags & _FLAG_RAW or table_len or pad:
-                raise ValueError('corrupt file: malformed end marker')
-            if fin.read(1):
-                raise ValueError('corrupt file: data after end marker')
-            break
-        if flags & _FLAG_RAW:
-            raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
-        else:
-            table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
-            table = deserialize_table(table_blob)
-            encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-            original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
-        if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
-            raise ValueError('corrupt file: checksum mismatch')
-        fout.write(original)
-        done += len(original)
-        _check_output_limit(done, max_output)
-        if progress is not None:
-            progress(done, total)
+    _decompress_chunks(fin, fout, progress, total, max_output, _HEADER_V2, True)
 
 
 def _decompress_chunks_v2(fin, fout, progress, total, max_output):
-    done = 0
-    while True:
-        header = fin.read(_HEADER_V2.size)
-        if not header:
-            break
-        if len(header) < _HEADER_V2.size:
-            raise ValueError('corrupt file: truncated chunk header')
-        chk, table_len, pad, flags = _HEADER_V2.unpack(header)
-        if flags & ~_FLAG_RAW:
-            # v2 has no END marker: the only legal flag bit is RAW.
-            raise ValueError('corrupt file: unknown chunk flags')
-        if flags & _FLAG_RAW:
-            raw_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            original = _read_bounded(fin, raw_len, 'raw chunk data', _MAX_RAW_LEN)
-        else:
-            table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
-            table = deserialize_table(table_blob)
-            encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-            encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-            original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
-        if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
-            raise ValueError('corrupt file: checksum mismatch')
-        fout.write(original)
-        done += len(original)
-        _check_output_limit(done, max_output)
-        if progress is not None:
-            progress(done, total)
+    _decompress_chunks(fin, fout, progress, total, max_output, _HEADER_V2, False)
 
 
 def _decompress_chunks_v1(fin, fout, progress, total, max_output):
-    done = 0
-    while True:
-        header = fin.read(_HEADER_V1.size)
-        if not header:
-            break
-        if len(header) < _HEADER_V1.size:
-            raise ValueError('corrupt file: truncated chunk header')
-        chk, table_len, pad = _HEADER_V1.unpack(header)
-        table_blob = _read_bounded(fin, table_len, 'Huffman table', _MAX_TABLE_LEN)
-        table = deserialize_table(table_blob)
-        encoded_len = _DATA_HEADER.unpack(_read_exact(fin, _DATA_HEADER.size, 'data header'))[0]
-        encoded = _read_bounded(fin, encoded_len, 'chunk data', _MAX_ENCODED_LEN)
-        original = lz77_decompress(huffman_decode(encoded, pad, table), max_out=_MAX_CHUNK_OUT)
-        if (zlib.crc32(original) & 0xFFFFFFFF) != chk:
-            raise ValueError('corrupt file: checksum mismatch')
-        fout.write(original)
-        done += len(original)
-        _check_output_limit(done, max_output)
-        if progress is not None:
-            progress(done, total)
+    _decompress_chunks(fin, fout, progress, total, max_output, _HEADER_V1, False)
+
+
+def expected_output_path(path, mode):
+    """Where compress/decompress writes its output for ``path``.
+
+    Single source of truth shared by the CLI and the GUI (both used to
+    carry their own copy of this naming rule): compress ->
+    ``path + '.vzip'``; decompress -> ``'.restored'``, replacing a
+    trailing ``'.vzip'`` when present. Mirrors the naming inside
+    :func:`compress_file` / :func:`decompress_file` exactly.
+    """
+    if mode == 'compress':
+        return path + '.vzip'
+    if path.endswith('.vzip'):
+        return path[: -len('.vzip')] + '.restored'
+    return path + '.restored'
 
 
 def compress_file(input_path, progress=None, overwrite=False):

@@ -15,10 +15,10 @@ import traceback
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 try:
-    from vectorzip.compressor import compress_file, decompress_file
+    from vectorzip.compressor import compress_file, decompress_file, expected_output_path
     from vectorzip import __version__
 except ImportError:  # running from the repo root
-    from src.compressor import compress_file, decompress_file
+    from src.compressor import compress_file, decompress_file, expected_output_path
     from src import __version__
 
 # ---------------------------------------------------------------------------
@@ -158,15 +158,11 @@ def fmt_bytes(num):
 def _expected_output(path, mode):
     """Where compress/decompress writes its output for ``path``.
 
-    Single source of truth for the worker, the quarantine logic, and the
-    pre-flight planner — mirrors compress_file/decompress_file naming
-    exactly.
+    Single entry point for the worker, the quarantine logic, and the
+    pre-flight planner; the naming rule itself lives in
+    ``src.compressor.expected_output_path``, shared with the CLI.
     """
-    if mode == 'compress':
-        return path + '.vzip'
-    if path.endswith('.vzip'):
-        return path[: -len('.vzip')] + '.restored'
-    return path + '.restored'
+    return expected_output_path(path, mode)
 
 
 def _move_noclobber(src, dest, overwrite):

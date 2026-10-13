@@ -8,10 +8,10 @@ from tqdm import tqdm
 
 try:
     # Installed package layout
-    from vectorzip.compressor import compress_file, decompress_file
+    from vectorzip.compressor import compress_file, decompress_file, expected_output_path
 except ImportError:
     # Running from the repo root
-    from src.compressor import compress_file, decompress_file
+    from src.compressor import compress_file, decompress_file, expected_output_path
 
 
 def _run_with_progress(label, func, path, **kwargs):
@@ -25,11 +25,9 @@ def _run_with_progress(label, func, path, **kwargs):
 
 
 def _expected_output(action, path):
-    if action == 'compress':
-        return path + '.vzip'
-    if path.endswith('.vzip'):
-        return path[: -len('.vzip')] + '.restored'
-    return path + '.restored'
+    # The naming rule itself lives in src.compressor.expected_output_path,
+    # shared with the GUI; this wrapper keeps the CLI's argument order.
+    return expected_output_path(path, action)
 
 
 def _quarantine_partial(path):
