@@ -28,15 +28,20 @@ def huffman_encode(data):
         # be '' and encode to zero bits. Assign a 1-bit code instead.
         sole = next(iter(table))
         table[sole] = '0'
-    # Integer codes precomputed once per table instead of per input byte.
-    int_table = {sym: (int(code, 2), len(code)) for sym, code in table.items()}
+    # Integer codes precomputed once per table instead of per input byte,
+    # in parallel lists indexed by byte value (cheaper than a dict of
+    # tuples in the per-byte loop).
+    codes = [0] * 256
+    clens = [0] * 256
+    for sym, code in table.items():
+        codes[sym] = int(code, 2) if code else 0
+        clens[sym] = len(code)
     bits = bytearray()
     acc = 0
     nbits = 0
     for b in data:
-        icode, clen = int_table[b]
-        acc = (acc << clen) | icode
-        nbits += clen
+        acc = (acc << clens[b]) | codes[b]
+        nbits += clens[b]
         while nbits >= 8:
             nbits -= 8
             bits.append((acc >> nbits) & 0xFF)
@@ -47,11 +52,26 @@ def huffman_encode(data):
     return bytes(bits), pad, table
 
 
+# Width (in bits) of the decode lookup table. A window of this many bits
+# resolves most symbols in one list index instead of one tree step per
+# bit. 9 keeps the table at 512 entries, so building it per call stays
+# cheap next to the bitstream it accelerates.
+_LUT_BITS = 9
+
+
 def huffman_decode(encoded_data, padding, table):
     """Decode packed bytes using ``table`` (inverse of huffman_encode).
 
     Table-driven: the code table is compiled into a binary decode tree
-    once, then the input is consumed byte-at-a-time through a bit cursor.
+    once, then the input is consumed through a bit accumulator. On top
+    of the tree sits a lookup table keyed by the next ``_LUT_BITS``
+    bits of the accumulator: each entry records the symbol the tree
+    walk would emit and how many bits it consumes, the fact that the
+    walk would hit a missing child (an invalid bitstream), or the tree
+    node a longer code continues from. Codes longer than the window,
+    and the final partial window, fall back to the same per-bit tree
+    walk — so the emitted bytes and the ``ValueError`` behavior are
+    exactly the tree walk's.
     Never materializes the bitstream as a string (the old implementation
     expanded every input byte into 8 characters).
     """
@@ -72,25 +92,75 @@ def huffman_decode(encoded_data, padding, table):
     total_bits = len(encoded_data) * 8 - padding
     if total_bits <= 0:
         return b''
+    width = min(_LUT_BITS, max(len(code) for code in table.values()))
+    lut = None
+    if width > 0:
+        # Entry shapes: (symbol, depth) — emit symbol, consume depth
+        # bits; (-1, depth) — the tree walk hits a missing child within
+        # the window; (None, node) — no symbol within the window, so
+        # continue the walk from node after consuming the whole window.
+        lut = []
+        for window in range(1 << width):
+            node = root
+            entry = None
+            for depth in range(1, width + 1):
+                bit = (window >> (width - depth)) & 1
+                child = node.get('1' if bit else '0')
+                if child is None:
+                    entry = (-1, depth)
+                    break
+                node = child
+                sym = node.get('sym')
+                if sym is not None:
+                    entry = (sym, depth)
+                    break
+            lut.append(entry if entry is not None else (None, node))
+    mask = (1 << width) - 1
     decoded = bytearray()
+    append = decoded.append
+    acc = 0  # bit accumulator: the next bits to consume are its low accbits
+    accbits = 0
+    idx = 0  # next byte of encoded_data to feed into acc
+    consumed = 0
     node = root
-    seen = 0
-    for byte in encoded_data:
-        remaining = total_bits - seen
-        if remaining <= 0:
-            break
-        take = 8 if remaining >= 8 else remaining
-        # Consume `take` bits MSB-first.
-        for shift in range(7, 7 - take, -1):
-            try:
-                node = node['1' if (byte >> shift) & 1 else '0']
-            except KeyError:
+    while consumed < total_bits:
+        if node is root and lut is not None and total_bits - consumed >= width:
+            while accbits < width:
+                acc = (acc << 8) | encoded_data[idx]
+                idx += 1
+                accbits += 8
+            sym, extra = lut[(acc >> (accbits - width)) & mask]
+            if sym is None:
+                # Code longer than the window: continue from this node.
+                node = extra
+                accbits -= width
+                consumed += width
+            elif sym < 0:
                 raise ValueError('corrupt file: invalid Huffman bitstream')
-            sym = node.get('sym')
-            if sym is not None:
-                decoded.append(sym)
-                node = root
-        seen += take
+            else:
+                append(sym)
+                accbits -= extra
+                consumed += extra
+            acc &= (1 << accbits) - 1
+            continue
+        # Per-bit walk: finishing a long code, or fewer than ``width``
+        # bits remain in the stream.
+        if accbits == 0:
+            acc = encoded_data[idx]
+            idx += 1
+            accbits = 8
+        accbits -= 1
+        bit = (acc >> accbits) & 1
+        acc &= (1 << accbits) - 1
+        consumed += 1
+        try:
+            node = node['1' if bit else '0']
+        except KeyError:
+            raise ValueError('corrupt file: invalid Huffman bitstream')
+        sym = node.get('sym')
+        if sym is not None:
+            append(sym)
+            node = root
     return bytes(decoded)
 
 
