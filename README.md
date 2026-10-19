@@ -7,6 +7,8 @@
 [![Tests](https://img.shields.io/badge/tests-81%2F81_passing-brightgreen)](tests/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#downloads)
 
+**Status:** Released — current version 1.2.4, as stated in the `VERSION` file (see also [CHANGELOG.md](CHANGELOG.md)). Standalone binaries for Windows and Linux are published on the Releases page; a PyPI release is planned but not yet published.
+
 **VectorZip** is a *completely lossless* file compression tool built in pure
 Python. It chains **LZ77** sliding-window dictionary matching with **Huffman**
 entropy coding to shrink files, and every 64 KiB chunk carries a **CRC32**
@@ -99,7 +101,7 @@ files compress fine on modest hardware.
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
 | `vectorzip.spec` | PyInstaller spec for the standalone release binaries. |
-| `tests/test_compression.py` | 53 pytest round-trip / corruption / legacy-format / safety / concurrency tests (with `tests/test_audit2_concurrency.py`). |
+| `tests/test_compression.py` | Core pytest suite (37 tests): round trips, corruption, legacy formats, and safety. Four further suites (`test_audit2_concurrency.py`, `test_bughunt2_strictness.py`, `test_huffman_table_strictness.py`, `test_symlink_output_safety.py`) bring the total to 81 tests. |
 | `tests/fuzz_decompress.py` | Stdlib-only decompressor fuzzer (also runs in CI). |
 | `tests/benchmark.py` | Dev-only throughput benchmark harness. |
 | `docs/compression.md` | Algorithm and container-format documentation. |
@@ -107,7 +109,7 @@ files compress fine on modest hardware.
 ## Feature rundown
 
 ### Compression engine
-- **Completely lossless** — byte-identical round trips, verified by 53 unit
+- **Completely lossless** — byte-identical round trips, verified by 81 unit
   tests and tens of thousands of fuzz cases per 5-minute CI run (0 unexpected
   exceptions).
 - **Fast on real data, instant on junk** — ~10 MB/s on compressible files;
@@ -323,11 +325,13 @@ See [docs/compression.md](docs/compression.md).
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q        # 53/53 passing
+python -m pytest tests/ -q        # 81 tests
 ```
 
 - **Unit tests** (`tests/test_compression.py`,
-  `tests/test_audit2_concurrency.py`) — 53 tests covering round trips at
+  `tests/test_audit2_concurrency.py`, `tests/test_bughunt2_strictness.py`,
+  `tests/test_huffman_table_strictness.py`, and
+  `tests/test_symlink_output_safety.py`) — 81 tests covering round trips at
   every size from empty to multi-chunk, chunk/window boundary conditions,
   byte-flip and truncation corruption, legacy v1/v2 archives,
   overwrite-refusal and symlink safety, output caps, cancel behavior,
