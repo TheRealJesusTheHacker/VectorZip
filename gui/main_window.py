@@ -294,7 +294,26 @@ class JobWorker(QtCore.QObject):
                         os.path.dirname(os.path.abspath(out))
                     ) != os.path.normcase(os.path.abspath(self.out_dir)):
                         dest = os.path.join(self.out_dir, os.path.basename(out))
-                        _move_noclobber(out, dest, self.overwrite)
+                        try:
+                            _move_noclobber(out, dest, self.overwrite)
+                        except FileExistsError:
+                            raise  # refusal semantics: handled below
+                        except Exception as move_err:
+                            # The archive at `out` is COMPLETE — only the
+                            # move into out_dir failed. Quarantining it as
+                            # .partial (the generic handler below) would
+                            # brand a valid archive as a failed partial.
+                            # Report the failure and keep the good file
+                            # where it is, telling the user where.
+                            self.file_done.emit(
+                                path,
+                                False,
+                                f"Move to output folder failed ({move_err}); "
+                                f"finished file kept at {out}",
+                                0,
+                                0,
+                            )
+                            continue
                         out = dest
                     out_size = os.path.getsize(out)
                     detail = f"{fmt_bytes(in_size)} → {fmt_bytes(out_size)}"
