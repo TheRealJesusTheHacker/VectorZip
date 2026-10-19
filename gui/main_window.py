@@ -756,7 +756,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
             self._log("Cancelling…", "warn")
 
     def _on_progress(self, done, total, label):
-        pct = int(done / total * 100) if total else 0
+        # Decompress reports done in output bytes against an input-size
+        # total, so the raw ratio can exceed 100 mid-run; clamp it.
+        pct = min(100, int(done / total * 100)) if total else 0
         self.bar.setValue(pct)
         self.prog_label.setText(f"{label} — {fmt_bytes(done)} / {fmt_bytes(total)}")
 
