@@ -10,8 +10,13 @@ setup(
     py_modules=["main", "gui_launcher"],
     install_requires=[
         "tqdm==4.70.1",
-        "PyQt6==6.11.0",
     ],
+    extras_require={
+        # The GUI (gui_launcher / vectorzip-gui) needs PyQt6; the CLI and
+        # the codec library do not, so CLI-only installs no longer have
+        # to pull in the full Qt stack. Install with: pip install .[gui]
+        "gui": ["PyQt6==6.11.0"],
+    },
     entry_points={
         'console_scripts': [
             'vzip=main:main',
