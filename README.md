@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/TheRealJesusTheHacker/VectorZip)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](setup.py)
-[![Tests](https://img.shields.io/badge/tests-53%2F53_passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-81%2F81_passing-brightgreen)](tests/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#downloads)
 
 **VectorZip** is a *completely lossless* file compression tool built in pure
@@ -213,7 +213,8 @@ low-level `lz77_compress` / `lz77_decompress` / `huffman_encode` /
 - Every release ships **`SHA256SUMS-windows.txt` / `SHA256SUMS-linux.txt`**
   and signed **build-provenance attestations** — verify before you run.
 - `pip install .` installs the `vectorzip` package plus the `vzip` CLI and
-  `vectorzip-gui` launcher.
+  `vectorzip-gui` launcher. The GUI's PyQt6 dependency is an extra —
+  `pip install .[gui]` — so CLI-only installs stay Qt-free.
 - A PyPI release (`vectorzip-py`) is **planned, not yet published** — the
   release-triggered publish workflow exists, but the package is not on PyPI
   today.
@@ -234,11 +235,13 @@ PyPI is planned but not published yet — install from source for now:
 ```bash
 git clone https://github.com/TheRealJesusTheHacker/VectorZip
 cd VectorZip
-pip install .
+pip install .          # CLI + library
+pip install .[gui]     # + the desktop GUI (adds PyQt6)
 ```
 
-This installs the `vectorzip` package, the `vzip` command-line tool, and the
-`vectorzip-gui` desktop app launcher.
+This installs the `vectorzip` package and the `vzip` command-line tool;
+the `[gui]` extra adds the `vectorzip-gui` desktop app launcher and its
+PyQt6 dependency.
 
 ## Downloads
 
