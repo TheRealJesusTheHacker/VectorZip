@@ -20,7 +20,12 @@ def _run_with_progress(label, func, path, **kwargs):
     with tqdm(total=total, unit='B', unit_scale=True, desc=label) as pbar:
 
         def _cb(done, _total):
-            pbar.update(done - pbar.n)
+            # Decompress reports done in OUTPUT bytes while the bar's
+            # total is the INPUT (compressed) size, so done routinely
+            # exceeds total mid-run and the bar rendered >100%. Clamp
+            # the position to the bar's own total; the compressor's
+            # final progress(total, total) call lands exactly on 100%.
+            pbar.update(min(done, total) - pbar.n)
 
         return func(path, progress=_cb, **kwargs)
 
