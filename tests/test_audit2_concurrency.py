@@ -307,6 +307,26 @@ class TestGuiWorker(unittest.TestCase):
             self.assertFalse(os.path.exists(cut[: -len('.vzip')] + '.restored'))
             self.assertTrue(os.path.exists(cut[: -len('.vzip')] + '.restored.partial'))
 
+    def test_worker_move_failure_keeps_completed_output(self):
+        # Regression: a failure in the MOVE step (after the archive was
+        # fully written) used to fall into the generic failure handler,
+        # which quarantined the COMPLETE archive to .partial — branding
+        # a valid result as a failed partial. The completed file must
+        # stay under its real name; only the move is reported failed.
+        g = self.g
+        with tempfile.TemporaryDirectory() as tmp:
+            p1, _p2, out = self._two_same_name(tmp)
+            with mock.patch.object(
+                g, '_move_noclobber', side_effect=PermissionError('dest locked')
+            ):
+                events = self._run_worker([p1], 'compress', out, False)
+            self.assertEqual(len(events), 1)
+            self.assertFalse(events[0][1])  # job reported failed (the move)
+            self.assertIn('kept at', events[0][2])
+            own = os.path.join(os.path.dirname(p1), 'a.txt.vzip')
+            self.assertTrue(os.path.exists(own))  # complete archive intact...
+            self.assertFalse(os.path.exists(own + '.partial'))  # ...not quarantined
+
     def test_worker_cancel_mid_job(self):
         g = self.g
         with tempfile.TemporaryDirectory() as tmp:
