@@ -41,7 +41,12 @@ def _quarantine_partial(path):
     for a good result (mirrors the GUI worker)."""
     if os.path.exists(path):
         try:
-            os.rename(path, path + '.partial')
+            # os.replace, not os.rename (same fix the GUI worker got):
+            # rename refuses to replace an existing destination on
+            # Windows, so a leftover .partial from an earlier failed run
+            # would leave the half-written output under its good-looking
+            # name. replace overwrites the leftover on every platform.
+            os.replace(path, path + '.partial')
         except OSError:
             pass
 
