@@ -107,7 +107,7 @@ class TestSymlinkOverwriteWithoutNofollow(unittest.TestCase):
             _src, archive = self._archive(tmp)
             restored = archive[: -len('.vzip')] + '.restored'
             os.symlink(victim, restored)
-            with mock.patch.object(os, 'O_NOFOLLOW', 0):
+            with mock.patch.object(os, 'O_NOFOLLOW', 0, create=True):
                 with self.assertRaises(OSError) as cm:
                     decompress_file(archive, overwrite=True)
             self.assertEqual(cm.exception.errno, errno.ELOOP)
@@ -122,7 +122,7 @@ class TestSymlinkOverwriteWithoutNofollow(unittest.TestCase):
             with open(src, 'wb') as f:
                 f.write(PAYLOAD)
             os.symlink(victim, src + '.vzip')
-            with mock.patch.object(os, 'O_NOFOLLOW', 0):
+            with mock.patch.object(os, 'O_NOFOLLOW', 0, create=True):
                 with self.assertRaises(OSError) as cm:
                     compress_file(src, overwrite=True)
             self.assertEqual(cm.exception.errno, errno.ELOOP)
@@ -136,7 +136,7 @@ class TestSymlinkOverwriteWithoutNofollow(unittest.TestCase):
             restored = archive[: -len('.vzip')] + '.restored'
             target = os.path.join(tmp, 'not-yet-created.txt')
             os.symlink(target, restored)
-            with mock.patch.object(os, 'O_NOFOLLOW', 0):
+            with mock.patch.object(os, 'O_NOFOLLOW', 0, create=True):
                 with self.assertRaises(OSError) as cm:
                     decompress_file(archive, overwrite=True)
             self.assertEqual(cm.exception.errno, errno.ELOOP)
@@ -223,10 +223,12 @@ _LIVE_SIGNAL_PROBE = textwrap.dedent('''
     import os, sys
     try:
         from PyQt6 import QtCore
+        sys.path.insert(0, os.getcwd())
+        from gui.main_window import JobWorker
     except ImportError:
+        # PyQt6 absent, or its system libraries (libEGL etc.) missing:
+        # the probe cannot run here — skip rather than false-fail.
         sys.exit(42)
-    sys.path.insert(0, os.getcwd())
-    from gui.main_window import JobWorker
 
     app = QtCore.QCoreApplication(sys.argv)
     worker = JobWorker([], 'compress', None, False)
