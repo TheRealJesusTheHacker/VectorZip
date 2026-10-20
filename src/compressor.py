@@ -162,6 +162,10 @@ def _open_new_output(path):
     """
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     flags |= getattr(os, 'O_NOFOLLOW', 0)
+    # O_BINARY matters on Windows: without it the fd is text-mode and
+    # a 0x0A byte in the archive would be written as CRLF, corrupting
+    # the file on disk. It is a no-op where the platform lacks it.
+    flags |= getattr(os, 'O_BINARY', 0)
     fd = os.open(path, flags, 0o666)
     return os.fdopen(fd, 'wb')
 
@@ -173,11 +177,13 @@ def _output_writer(path, overwrite):
 def _open_overwrite_output(path):
     """Open ``path`` for writing, clobbering it if it is a real file.
 
-    ``O_NOFOLLOW`` (where the platform provides it) stops a pre-planted
-    symlink from redirecting the write: ``evil.restored -> victim.txt``
-    raises ``OSError`` (ELOOP) instead of silently overwriting
-    ``victim.txt``. A missing file is created as usual, so real-file
-    behaviour is unchanged.
+    A pre-planted symlink must never redirect the write:
+    ``evil.restored -> victim.txt`` raises ``OSError`` (ELOOP) instead
+    of silently overwriting ``victim.txt``. Two layers deliver that:
+    an up-front ``os.path.islink`` refusal on every platform, and the
+    ``O_NOFOLLOW`` open flag where the platform provides it (POSIX),
+    which also closes the check-to-open gap atomically. A missing file
+    is created as usual, so real-file behaviour is unchanged.
 
     Hard links need a second step, because no open flag refuses them:
     a planted hard link at the output path would make a plain
@@ -193,9 +199,24 @@ def _open_overwrite_output(path):
     link count, ``st_nlink`` is 1 and the in-place path is taken —
     the same residual platform caveat as ``O_NOFOLLOW`` on Windows.)
     """
+    if os.path.islink(path):
+        # Platforms without O_NOFOLLOW (Windows) have no open flag that
+        # refuses a symlink, so check for one up front: without this an
+        # overwrite on Windows silently follows a pre-planted symlink
+        # and clobbers its target. On POSIX the O_NOFOLLOW open below
+        # still guards the check-to-open gap atomically; on Windows a
+        # symlink swapped in during that gap remains the documented
+        # residual (see README, "Security model").
+        raise OSError(
+            errno.ELOOP,
+            f'refusing to write through symlink at output path: {path} '
+            f'(aborting to avoid clobbering the link target)',
+        )
     nofollow = getattr(os, 'O_NOFOLLOW', 0)
     try:
-        fd = os.open(path, os.O_WRONLY | nofollow)
+        # O_BINARY: see _open_new_output — the fd must be binary-mode
+        # on Windows or archive bytes containing 0x0A are mangled.
+        fd = os.open(path, os.O_WRONLY | nofollow | getattr(os, 'O_BINARY', 0))
     except FileNotFoundError:
         return _open_new_output(path)
     except OSError as e:

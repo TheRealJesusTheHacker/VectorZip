@@ -191,7 +191,9 @@ def _move_noclobber(src, dest, overwrite):
         # mounts). The link was only ever an optimization — the O_EXCL
         # claim below is the actual no-clobber guarantee — so fall back
         # to claiming dest atomically and copying into it.
-        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        # O_BINARY: on Windows an fd without it is text-mode and would
+        # mangle archive bytes (0x0A -> CRLF) during the copy.
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0))
         try:
             with os.fdopen(fd, 'wb') as fout, open(src, 'rb') as fin:
                 shutil.copyfileobj(fin, fout)
@@ -239,8 +241,13 @@ def _plan_jobs(jobs, mode, out_dir, overwrite):
 
 
 class JobWorker(QtCore.QObject):
-    progress = QtCore.pyqtSignal(int, int, str)  # done, total, label
-    file_done = QtCore.pyqtSignal(str, bool, str, int, int)  # path, ok, detail, in_size, out_size
+    # Byte counts are qint64, not int: Qt's int is 32-bit, so a job past
+    # 2 GiB wrapped its progress and file sizes to negative values on the
+    # receiving side (corrupting the progress bar and the batch stats).
+    progress = QtCore.pyqtSignal('qint64', 'qint64', str)  # done, total, label
+    file_done = QtCore.pyqtSignal(
+        str, bool, str, 'qint64', 'qint64'
+    )  # path, ok, detail, in_size, out_size
     finished = QtCore.pyqtSignal()
 
     def __init__(self, jobs, mode, out_dir, overwrite):

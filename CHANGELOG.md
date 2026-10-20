@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] — 2026-10-20
+
+**The Windows kit-hunt release.** A physical Windows test of the
+Technician's Toolkit bundle exposed defects in sibling tools that no
+Linux process had caught, so VectorZip was hunted specifically for
+Windows-shaped, frozen-build, and clean-machine failures before the
+next physical test. Three real defects were found, each with a
+regression pin proven to fail on the pre-fix code; the on-disk format
+did not change and archives written by earlier versions decompress
+exactly as before.
+
+### Security
+- Overwrite (`--force` / `overwrite=True`) no longer follows a planted
+  symlink on platforms without `O_NOFOLLOW` — notably Windows, where
+  the flag contributes 0 and the write previously went straight
+  through the link and clobbered its target. The overwrite path now
+  refuses up front when the output path is a symlink (same `ELOOP`
+  refusal as POSIX), on every platform. Residual, documented in the
+  README security model: on Windows a symlink swapped in between that
+  check and the open could still be followed (no atomic flag exists);
+  POSIX keeps the atomic `O_NOFOLLOW` guarantee.
+- Every raw-fd output open now requests `O_BINARY` where the platform
+  provides it (engine fresh-create and overwrite opens, and the GUI
+  worker's no-clobber move fallback copy). On Windows an fd without
+  it is text-mode, which can translate `0x0A` bytes in an archive to
+  CRLF and corrupt the file on disk — the failure class that damaged
+  a sibling tool's key file on a physical Windows test.
+
+### Fixed
+- GUI worker signals now carry 64-bit byte counts (`qint64`) instead
+  of 32-bit Qt `int`. Past 2 GiB, a job's progress and per-file sizes
+  wrapped to negative values on the receiving side, corrupting the
+  progress display and the batch statistics for exactly the
+  multi-gigabyte files the engine is built for. Proven with a live
+  PyQt6 probe (3 GB / 5 GB counts arrive exact, not wrapped).
+
+### Changed
+- CI now runs the full pytest suite on `windows-latest` as well as
+  Linux (Windows previously got only a byte-compile), and both CI and
+  the release workflow build the frozen exe from the release spec on
+  Windows and smoke-launch it (offscreen Qt; the app must still be
+  running seconds later) — in the release workflow, before any asset
+  is uploaded. `ci.yml` also accepts manual dispatch.
+- 7 new tests (97 total) in `tests/test_kithunt_windows.py`.
+
 ## [1.2.5] — 2026-10-20
 
 **The portable release.** This release's headline is packaging: the

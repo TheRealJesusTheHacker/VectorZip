@@ -24,6 +24,16 @@ jobs:
           pip install pyinstaller==6.22.3
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm vectorzip.spec
+      - name: Frozen app start smoke (offscreen Qt)
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process -FilePath "dist\VectorZip.exe" -PassThru
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) { throw "VectorZip.exe exited during the start smoke with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Start smoke OK: the frozen app was still running after 12s"
       - name: Assemble the portable edition
         run: python packaging/portable/build-portable.py --binary dist/VectorZip.exe --output dist/VectorZipPortable.zip
       - name: Generate SHA256 hashes

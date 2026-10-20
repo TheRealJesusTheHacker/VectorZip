@@ -8,6 +8,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   compile:
@@ -46,6 +47,33 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Run test suite
         run: python -m pytest tests/ -v
+
+  test-windows:
+    name: Unit tests + frozen start smoke (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run the full test suite on Windows
+        run: python -m pytest tests/ -v
+      - name: Build the frozen app (same spec as releases)
+        run: |
+          pip install pyinstaller==6.22.3
+          pyinstaller --noconfirm vectorzip.spec
+      - name: Frozen app start smoke (offscreen Qt)
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process -FilePath "dist\VectorZip.exe" -PassThru
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) { throw "VectorZip.exe exited during the start smoke with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Start smoke OK: the frozen app was still running after 12s"
 
   lint:
     name: Lint & format check (ruff + black)

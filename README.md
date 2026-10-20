@@ -3,8 +3,8 @@
 **Lossless file compression in pure Python — LZ77 + Huffman in a chunked, CRC32-verified `.vzip` container, with a CLI, a desktop GUI, and output-safety hardening that treats both archives and output paths as untrusted.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/TheRealJesusTheHacker/VectorZip/ci.yml?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.2.5-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
-[![Tests](https://img.shields.io/badge/tests-90%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
+[![Version](https://img.shields.io/badge/version-1.2.6-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
+[![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/blob/main/setup.py)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green?style=flat-square)](LICENSE)
 
@@ -41,9 +41,9 @@ Nothing is compiled into the package itself: the engine is pure Python
 needs `tqdm` for its progress bars; the GUI needs PyQt6, which is an
 optional install extra so CLI-only installs stay Qt-free.
 
-**Status:** Released — current version **1.2.5**, stated identically in
+**Status:** Released — current version **1.2.6**, stated identically in
 `VERSION`, `setup.py`, and `src/__init__.py` (`__version__`), and matching
-the latest GitHub release ([v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5)). Standalone binaries and portable
+the latest GitHub release ([v1.2.6](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.6)). Standalone binaries and portable
 zips for Windows and Linux are published on the Releases page. A PyPI
 release is planned but **not yet published** — see [Install](#install)
 and [Status and roadmap](#status-and-roadmap). The hardening and
@@ -55,7 +55,7 @@ performance work previously listed under `[Unreleased]` in
 ### Compression engine
 
 - **Completely lossless** — byte-identical round trips, covered by a
-  90-test suite and a stdlib-only decompressor fuzzer that runs in CI
+  97-test suite and a stdlib-only decompressor fuzzer that runs in CI
   (see [Development and testing](#development-and-testing)).
 - **Fast on real data, instant on junk** — incompressible chunks are
   detected and stored raw instead of being force-compressed, so random or
@@ -196,8 +196,8 @@ decompression-bomb cap. The low-level `lz77_compress` / `lz77_decompress`
 
 | Platform | Download |
 |----------|----------|
-| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZip.exe) |
-| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZip) |
+| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZip.exe) |
+| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZip) |
 
 These are the windowed desktop app, built by PyInstaller from
 `vectorzip.spec`. (Screenshots: none published — the GUI ships in the
@@ -216,21 +216,21 @@ Get-FileHash VectorZip.exe -Algorithm SHA256
 sha256sum -c SHA256SUMS-linux.txt
 ```
 
-Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/SHA256SUMS-linux.txt)
+Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/SHA256SUMS-linux.txt)
 
 ### Portable edition (no install)
 
 **Shipped — available since [v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5).** Download
-[VectorZipPortable.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZipPortable.zip)
+[VectorZipPortable.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZipPortable.zip)
 (Windows) or
-[VectorZipPortable-linux.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZipPortable-linux.zip)
+[VectorZipPortable-linux.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZipPortable-linux.zip)
 (Linux). The release workflow assembles a portable zip for each
 platform, containing the standalone binary and
 `packaging/portable/README-PORTABLE.txt`. Unzip it into any folder
 (including a USB stick), run the app, delete the folder to remove
 it. Nothing is installed and no Python is required.
 
-These portable zips ship in the v1.2.5 release assets, and each
+These portable zips ship in the release assets, and each
 platform's `SHA256SUMS-*.txt` covers the portable zip as well as
 the binary.
 
@@ -401,13 +401,16 @@ write). The defenses, as implemented in `src/compressor.py`:
   atomic step — `os.open` with `O_CREAT | O_EXCL`, plus `O_NOFOLLOW`
   where the platform provides it. Anything already at the output path,
   symlink included, raises `FileExistsError` and is never followed.
-- **Overwrite (`--force` / `overwrite=True`):** the output is opened
-  with `O_NOFOLLOW` (where available) *without* truncating first. A
+- **Overwrite (`--force` / `overwrite=True`):** the output path is
+  checked for a symlink first (every platform), then opened with
+  `O_NOFOLLOW` (where available) *without* truncating first. A
   symlink at the output path — live or dangling — fails with `OSError`
   (`ELOOP`) and a message naming the refusal, and the link target is
   never touched. Regression tests plant real symlinks and assert the
   victim file stays byte-identical for both compress and decompress, in
-  both modes (`tests/test_symlink_output_safety.py`).
+  both modes (`tests/test_symlink_output_safety.py`), including with
+  `O_NOFOLLOW` simulated as absent — the Windows shape
+  (`tests/test_kithunt_windows.py`).
 
 ### Untrusted output paths — hard links
 
@@ -435,16 +438,19 @@ halves of the contract (`tests/test_hardlink_output_safety.py`).
 ### Platform caveat — read this honestly
 
 `O_NOFOLLOW` is a POSIX facility. The code requests it with
-`getattr(os, 'O_NOFOLLOW', 0)`, so **on platforms that don't provide it
-— notably Windows — the symlink refusal at open time does not apply**:
-the no-overwrite path is still protected by the atomic `O_EXCL` create,
-but an overwrite on such a platform can follow a pre-planted symlink.
-The symlink regression tests are POSIX-only for exactly this reason.
-The hardlink defense has the analogous residual caveat: it depends on
-the platform reporting a link count — where `st_nlink` is reported as
-1 regardless, the in-place path is taken. Treat the symlink/hardlink
-guarantees as **POSIX guarantees**, and be correspondingly careful with
-`--force` in shared output directories on Windows.
+`getattr(os, 'O_NOFOLLOW', 0)`. On platforms that don't provide it —
+notably Windows — the overwrite path instead refuses up front when
+the output path **is** a symlink (`os.path.islink`), which closes the
+pre-planted-symlink case on every platform. The residual on Windows
+is the check-to-open gap: a symlink swapped in *between* that check
+and the open could still be followed, because Windows has no atomic
+open flag for it; on POSIX the `O_NOFOLLOW` open closes the same gap
+atomically. The no-overwrite path is protected everywhere by the
+atomic `O_EXCL` create. The hardlink defense has the analogous
+residual caveat: it depends on the platform reporting a link count —
+where `st_nlink` is reported as 1 regardless, the in-place path is
+taken. Be correspondingly careful with `--force` in shared output
+directories on Windows.
 
 ### Other boundaries
 
@@ -454,6 +460,10 @@ guarantees as **POSIX guarantees**, and be correspondingly careful with
   produce a torn archive (see [Features](#features)).
 - Failed or cancelled jobs quarantine half-written outputs to
   `.partial` (see [Features](#features)).
+- Every raw-fd output open (engine fresh-create and overwrite, and
+  the GUI's no-clobber move fallback) requests `O_BINARY` where the
+  platform provides it, so on Windows no archive byte is ever subject
+  to text-mode newline translation.
 - CRC32 is an integrity check against corruption and casual tampering,
   **not** a cryptographic authenticity check — VectorZip does not sign
   archives, and a CRC match does not prove who wrote a file. For the
@@ -506,12 +516,12 @@ release builds; a plain `pip install .` does not require it).
 | `src/lz77.py` | LZ77 compressor/decompressor: 32 KiB window, greedy 3-byte hash matching, `>HBB` tokens, optional per-call output cap. |
 | `src/huffman.py` | Huffman encoder/decoder (table-driven decode with a 9-bit lookup), plus strict code-table serialization/deserialization for the container format. |
 | `src/compressor.py` | The engine: `compress_file` / `decompress_file`, `expected_output_path`, the workhorse policy, format v1/v2/v3 readers, output-cap enforcement, and all the overwrite/symlink/hardlink safety logic. |
-| `src/__init__.py` | Public API surface and `__version__` (`1.2.5`). |
+| `src/__init__.py` | Public API surface and `__version__` (`1.2.6`). |
 | `main.py` | The `vzip` CLI: argument parsing, tqdm progress bars, cancel/OOM/failure quarantine of partial outputs. |
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log, atomic no-clobber output-folder move, batch duplicate-output planning. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
 | `vectorzip.spec` | PyInstaller spec for the standalone release binaries (windowed, no console). |
-| `tests/` | The pytest suite — 90 tests across seven files; see [Development and testing](#development-and-testing). |
+| `tests/` | The pytest suite — 97 tests across eight files; see [Development and testing](#development-and-testing). |
 | `tests/fuzz_decompress.py` | Stdlib-only decompressor fuzzer (also runs in CI). |
 | `tests/benchmark.py` | Dev-only throughput benchmark harness. |
 | `docs/compression.md` | Algorithm and container-format documentation for v1/v2/v3. |
@@ -532,10 +542,10 @@ release builds; a plain `pip install .` does not require it).
 git clone https://github.com/TheRealJesusTheHacker/VectorZip
 cd VectorZip
 pip install -r requirements-dev.txt   # pytest (pinned) + runtime deps
-python -m pytest tests/ -q            # 90 tests
+python -m pytest tests/ -q            # 97 tests
 ```
 
-The suite is **90 tests**, collected and run from the current tree:
+The suite is **97 tests**, collected and run from the current tree:
 
 | File | Tests | Covers |
 |---|---|---|
@@ -545,6 +555,7 @@ The suite is **90 tests**, collected and run from the current tree:
 | `tests/test_huffman_table_strictness.py` | 8 | Huffman table rejection cases (zero-length, overlong, overflowing, duplicate) plus the accepted 64-bit boundary and normal round trips. |
 | `tests/test_hardlink_output_safety.py` | 6 | Planted-hardlink overwrite attacks for compress and decompress (victim and input-linked cases), in-place truncation for singly-linked files, CLI quarantine replacing a leftover `.partial`. |
 | `tests/test_symlink_output_safety.py` | 5 | Planted-symlink attacks for compress and decompress in both modes, dangling symlinks, and the legitimate overwrite path. POSIX-only. |
+| `tests/test_kithunt_windows.py` | 7 | Windows-shaped regressions: planted-symlink overwrite with `O_NOFOLLOW` absent, `O_BINARY` requested on every raw-fd output open, GUI worker signals carrying 64-bit byte counts (live PyQt6 probe). |
 | `tests/test_huffman_decode_padding.py` | 3 | `huffman_decode` padding validation: negative and oversized padding raise `ValueError`; boundary values still decode. |
 
 **Fuzzing.** `tests/fuzz_decompress.py` is stdlib-only: it builds a seed
@@ -566,9 +577,12 @@ round-trips across sizes 0–200 KB, a truncate-at-every-offset sweep, and
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request
 to `main`: byte-compilation on Linux and Windows (Python 3.11), the full
-pytest suite, a CLI compress → decompress → byte-compare round trip,
-and ruff + black checks with pinned tool versions and the
-`pyproject.toml` style config. CodeQL analysis runs via
+pytest suite on **both** Linux and Windows, a frozen-app start smoke on
+Windows (the release spec's exe is built and launched, offscreen, and
+must still be running seconds later — the release workflow runs the
+same smoke before anything is uploaded), a CLI compress → decompress →
+byte-compare round trip, and ruff + black checks with pinned tool
+versions and the `pyproject.toml` style config. CodeQL analysis runs via
 `.github/workflows/codeql.yml`.
 
 **Building the standalone app:**
@@ -591,9 +605,16 @@ signed build-provenance attestations attached to the release.
 
 ## Status and roadmap
 
-- **Current release: 1.2.5** (2026-10-20) — standalone Windows and Linux
+- **Current release: 1.2.6** (2026-10-20) — standalone Windows and Linux
   binaries and portable zips on the Releases page, with checksums and
-  attestations: [v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5).
+  attestations: [v1.2.6](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.6).
+- **Shipped in 1.2.6:** the Windows kit-hunt fixes — overwrite no longer
+  follows a planted symlink on platforms without `O_NOFOLLOW` (Windows
+  included), every raw-fd output open requests `O_BINARY`, and the GUI
+  worker's signals carry 64-bit byte counts so jobs past 2 GiB no
+  longer report wrapped/negative progress and stats. CI now runs the
+  full test suite on Windows and smoke-launches the frozen exe; the
+  release workflow runs the same start smoke before uploading.
 - **Shipped in 1.2.5:** stricter container/Huffman-table validation
   (empty table, `pad_bits`, table-entry strictness), CLI
   `--max-output-gb` validation, output-path symlink/hardlink hardening,
