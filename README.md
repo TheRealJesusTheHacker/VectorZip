@@ -220,6 +220,22 @@ sha256sum -c SHA256SUMS-linux.txt
 
 Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-linux.txt)
 
+### Portable edition (no install)
+
+**Packaging ready — ships with the next release.** The release
+workflow on `main` now assembles a portable zip for each platform —
+`VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
+(Linux) — containing the standalone binary and
+`packaging/portable/README-PORTABLE.txt`. Unzip it into any folder
+(including a USB stick), run the app, delete the folder to remove
+it. Nothing is installed and no Python is required.
+
+These portable zips are **not** in the v1.2.4 release assets yet;
+they will be attached starting with the next tagged release, and
+each platform's `SHA256SUMS-*.txt` will cover the portable zip as
+well as the binary. Until then, the standalone binaries above are
+themselves single-file downloads that run without an install.
+
 ### From source
 
 PyPI is **planned but not yet published**: the release-triggered publish
@@ -564,9 +580,16 @@ pip install -r requirements.txt pyinstaller
 pyinstaller --noconfirm vectorzip.spec   # -> dist/VectorZip(.exe)
 ```
 
+The portable zips are assembled by the same script CI runs
+(`packaging/portable/build-portable.py`):
+
+```bash
+python packaging/portable/build-portable.py --binary dist/VectorZip.exe --output dist/VectorZipPortable.zip
+```
+
 Tagged releases (`v*`) are built automatically by GitHub Actions for
-Windows and Linux, with SHA256 checksums and signed build-provenance
-attestations attached to the release.
+Windows and Linux, with the portable zips, SHA256 checksums, and
+signed build-provenance attestations attached to the release.
 
 ## Status and roadmap
 
@@ -581,6 +604,12 @@ attestations attached to the release.
   unified in `expected_output_path`). Also present in the code and tests
   on `main` is the hardlink output-safety work described above. These
   ship with the next version bump; the 1.2.4 binaries predate them.
+- **Portable edition: packaging ready, ships with the next release.**
+  `VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
+  (Linux) are assembled by the release workflow on `main` (see
+  [Portable edition](#portable-edition-no-install)); they are not in
+  the v1.2.4 assets. The next tagged release is the first that will
+  carry them.
 - **PyPI: pending, owner-side.** The trusted-publisher publish workflow
   is in the repo and fires on release publication, but the
   `vectorzip-py` project is not live on PyPI yet — until it is, install
