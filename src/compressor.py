@@ -173,17 +173,31 @@ def _output_writer(path, overwrite):
 def _open_overwrite_output(path):
     """Open ``path`` for writing, clobbering it if it is a real file.
 
-    ``O_TRUNC`` gives ``--force``/``overwrite=True`` its plain clobber
-    semantics for real files, while ``O_NOFOLLOW`` (where the platform
-    provides it) stops a pre-planted symlink from redirecting the write:
-    ``evil.restored -> victim.txt`` raises ``OSError`` (ELOOP) instead of
-    silently overwriting ``victim.txt``. A missing file is created as
-    usual, so real-file behaviour is unchanged.
+    ``O_NOFOLLOW`` (where the platform provides it) stops a pre-planted
+    symlink from redirecting the write: ``evil.restored -> victim.txt``
+    raises ``OSError`` (ELOOP) instead of silently overwriting
+    ``victim.txt``. A missing file is created as usual, so real-file
+    behaviour is unchanged.
+
+    Hard links need a second step, because no open flag refuses them:
+    a planted hard link at the output path would make a plain
+    ``O_TRUNC`` write clobber the *other* file sharing the inode —
+    which can even be the input file itself, truncated while it is
+    being read. So an existing output is first opened *without*
+    ``O_TRUNC`` and inspected through the fd (a path swap after the
+    open cannot redirect an fd): a singly-linked regular file is
+    truncated in place exactly as before, while a multiply-linked
+    file is unlinked and replaced with a fresh file at the same path.
+    The output path still ends up holding the new content, but the
+    other link keeps its bytes. (On a platform that does not report a
+    link count, ``st_nlink`` is 1 and the in-place path is taken —
+    the same residual platform caveat as ``O_NOFOLLOW`` on Windows.)
     """
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    flags |= getattr(os, 'O_NOFOLLOW', 0)
+    nofollow = getattr(os, 'O_NOFOLLOW', 0)
     try:
-        fd = os.open(path, flags, 0o666)
+        fd = os.open(path, os.O_WRONLY | nofollow)
+    except FileNotFoundError:
+        return _open_new_output(path)
     except OSError as e:
         if e.errno == errno.ELOOP:
             raise OSError(
@@ -192,6 +206,19 @@ def _open_overwrite_output(path):
                 f'(aborting to avoid clobbering the link target)',
             )
         raise
+    try:
+        st = os.fstat(fd)
+    except BaseException:
+        os.close(fd)
+        raise
+    if st.st_nlink > 1:
+        # Multiply-linked: never truncate the shared inode. Drop this
+        # name and create a fresh file in its place (O_EXCL, so a name
+        # planted in the gap fails the open instead of being followed).
+        os.close(fd)
+        os.unlink(path)
+        return _open_new_output(path)
+    os.ftruncate(fd, 0)
     return os.fdopen(fd, 'wb')
 
 
