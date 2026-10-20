@@ -3,7 +3,7 @@
 **Lossless file compression in pure Python — LZ77 + Huffman in a chunked, CRC32-verified `.vzip` container, with a CLI, a desktop GUI, and output-safety hardening that treats both archives and output paths as untrusted.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/TheRealJesusTheHacker/VectorZip/ci.yml?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.2.6-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.2.7-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
 [![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/blob/main/setup.py)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green?style=flat-square)](LICENSE)
@@ -41,9 +41,9 @@ Nothing is compiled into the package itself: the engine is pure Python
 needs `tqdm` for its progress bars; the GUI needs PyQt6, which is an
 optional install extra so CLI-only installs stay Qt-free.
 
-**Status:** Released — current version **1.2.6**, stated identically in
+**Status:** Released — current version **1.2.7**, stated identically in
 `VERSION`, `setup.py`, and `src/__init__.py` (`__version__`), and matching
-the latest GitHub release ([v1.2.6](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.6)). Standalone binaries and portable
+the latest GitHub release ([v1.2.7](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.7)). Standalone binaries and portable
 zips for Windows and Linux are published on the Releases page. A PyPI
 release is planned but **not yet published** — see [Install](#install)
 and [Status and roadmap](#status-and-roadmap). The hardening and
@@ -196,8 +196,8 @@ decompression-bomb cap. The low-level `lz77_compress` / `lz77_decompress`
 
 | Platform | Download |
 |----------|----------|
-| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZip.exe) |
-| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZip) |
+| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/VectorZip.exe) |
+| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/VectorZip) |
 
 These are the windowed desktop app, built by PyInstaller from
 `vectorzip.spec`. (Screenshots: none published — the GUI ships in the
@@ -216,14 +216,14 @@ Get-FileHash VectorZip.exe -Algorithm SHA256
 sha256sum -c SHA256SUMS-linux.txt
 ```
 
-Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/SHA256SUMS-linux.txt)
+Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/SHA256SUMS-linux.txt)
 
 ### Portable edition (no install)
 
 **Shipped — available since [v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5).** Download
-[VectorZipPortable.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZipPortable.zip)
+[VectorZipPortable.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/VectorZipPortable.zip)
 (Windows) or
-[VectorZipPortable-linux.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.6/VectorZipPortable-linux.zip)
+[VectorZipPortable-linux.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.7/VectorZipPortable-linux.zip)
 (Linux). The release workflow assembles a portable zip for each
 platform, containing the standalone binary and
 `packaging/portable/README-PORTABLE.txt`. Unzip it into any folder
@@ -516,7 +516,7 @@ release builds; a plain `pip install .` does not require it).
 | `src/lz77.py` | LZ77 compressor/decompressor: 32 KiB window, greedy 3-byte hash matching, `>HBB` tokens, optional per-call output cap. |
 | `src/huffman.py` | Huffman encoder/decoder (table-driven decode with a 9-bit lookup), plus strict code-table serialization/deserialization for the container format. |
 | `src/compressor.py` | The engine: `compress_file` / `decompress_file`, `expected_output_path`, the workhorse policy, format v1/v2/v3 readers, output-cap enforcement, and all the overwrite/symlink/hardlink safety logic. |
-| `src/__init__.py` | Public API surface and `__version__` (`1.2.6`). |
+| `src/__init__.py` | Public API surface and `__version__` (`1.2.7`). |
 | `main.py` | The `vzip` CLI: argument parsing, tqdm progress bars, cancel/OOM/failure quarantine of partial outputs. |
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log, atomic no-clobber output-folder move, batch duplicate-output planning. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
@@ -605,9 +605,14 @@ signed build-provenance attestations attached to the release.
 
 ## Status and roadmap
 
-- **Current release: 1.2.6** (2026-10-20) — standalone Windows and Linux
+- **Current release: 1.2.7** (2026-10-20) — standalone Windows and Linux
   binaries and portable zips on the Releases page, with checksums and
-  attestations: [v1.2.6](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.6).
+  attestations: [v1.2.7](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.7).
+- **Shipped in 1.2.7:** the namesake "blueprint" palette — the GUI's
+  colors now live in a single theme module (`gui/theme.py`) carrying the
+  graphite-slate + blueprint-cyan identity, with the fleet danger red
+  for destructive actions. Colors only: no behavior, layout, wording,
+  or format change, and the 1.2.6 Windows fixes stand untouched.
 - **Shipped in 1.2.6:** the Windows kit-hunt fixes — overwrite no longer
   follows a planted symlink on platforms without `O_NOFOLLOW` (Windows
   included), every raw-fd output open requests `O_BINARY`, and the GUI

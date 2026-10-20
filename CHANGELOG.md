@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] — 2026-10-20
+
+**The namesake palette release.** VectorZip's GUI gets the identity its
+name calls for — vectors, blueprints, precision: a graphite-slate
+surface ruled with blueprint-cyan lines and pale-cyan fine detail,
+replacing the earlier electric-cyan dark theme. This is a colors-only
+release: no behavior, layout, wording, or on-disk format change, and
+the v1.2.6 Windows kit-hunt fixes (symlink-refusing overwrite,
+`O_BINARY` output descriptors, 64-bit progress signals, the Windows CI
+gate) are byte-for-byte untouched.
+
+### Changed
+- GUI colors are centralized in a new single-source theme module,
+  `gui/theme.py`; the main window imports every color from it and no
+  color literals remain anywhere else in `gui/`. The danger button now
+  uses the fleet danger red (`#b03a2e`) shared by every Sentinel tool —
+  a dark-red border at rest and a red fill with white text on hover —
+  while error *text* keeps the brighter signal red, which is the
+  readable form of red on these dark surfaces.
+- Theme tests (`tests/test_gui_theme.py`) pin the palette's exact
+  values, the alias wiring, the no-purple rule, and WCAG contrast
+  ≥4.5:1 for every text/background pair the stylesheet renders
+  (worst pair: disabled text on panel, 5.65:1).
+
 ## [1.2.6] — 2026-10-20
 
 **The Windows kit-hunt release.** A physical Windows test of the
