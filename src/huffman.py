@@ -77,6 +77,15 @@ def huffman_decode(encoded_data, padding, table):
     """
     if not table or not encoded_data:
         return b''
+    # Padding is the number of unused bits in the final byte, so the
+    # encoder only ever produces 0..7. The container reader validates
+    # this before calling, but huffman_decode is also a public API:
+    # an out-of-range value previously either crashed with IndexError
+    # (negative) or silently returned truncated/empty output (too
+    # large) instead of the ValueError corrupt-input contract the rest
+    # of the format code uses.
+    if not 0 <= padding <= 7:
+        raise ValueError('corrupt file: invalid Huffman padding')
     # Compile the prefix-free code table into a decode tree.
     # Internal nodes: {'0': child, '1': child}; leaves: {'sym': byte}.
     root = {}
