@@ -24,23 +24,27 @@ jobs:
           pip install pyinstaller==6.22.3
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm vectorzip.spec
+      - name: Assemble the portable edition
+        run: python packaging/portable/build-portable.py --binary dist/VectorZip.exe --output dist/VectorZipPortable.zip
       - name: Generate SHA256 hashes
         shell: pwsh
         run: |
           cd dist
-          Get-ChildItem *.exe | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.Name } | Out-File -Encoding ascii SHA256SUMS-windows.txt
+          @("VectorZip.exe", "VectorZipPortable.zip") | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash, $_ } | Out-File -Encoding ascii SHA256SUMS-windows.txt
           Get-Content SHA256SUMS-windows.txt
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4
         with:
           subject-path: |
             dist/*.exe
+            dist/VectorZipPortable.zip
             dist/SHA256SUMS-windows.txt
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             dist/*.exe
+            dist/VectorZipPortable.zip
             dist/SHA256SUMS-windows.txt
           generate_release_notes: true
 
@@ -66,20 +70,24 @@ jobs:
           pip install pyinstaller==6.22.3
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm vectorzip.spec
+      - name: Assemble the portable edition
+        run: python packaging/portable/build-portable.py --binary dist/VectorZip --output dist/VectorZipPortable-linux.zip
       - name: Generate SHA256 hashes
         run: |
           cd dist
-          sha256sum VectorZip > SHA256SUMS-linux.txt
+          sha256sum VectorZip VectorZipPortable-linux.zip > SHA256SUMS-linux.txt
           cat SHA256SUMS-linux.txt
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4
         with:
           subject-path: |
             dist/VectorZip
+            dist/VectorZipPortable-linux.zip
             dist/SHA256SUMS-linux.txt
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             dist/VectorZip
+            dist/VectorZipPortable-linux.zip
             dist/SHA256SUMS-linux.txt
