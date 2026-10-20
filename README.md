@@ -3,7 +3,7 @@
 **Lossless file compression in pure Python — LZ77 + Huffman in a chunked, CRC32-verified `.vzip` container, with a CLI, a desktop GUI, and output-safety hardening that treats both archives and output paths as untrusted.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/TheRealJesusTheHacker/VectorZip/ci.yml?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.2.4-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.2.5-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
 [![Tests](https://img.shields.io/badge/tests-90%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/blob/main/setup.py)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green?style=flat-square)](LICENSE)
@@ -41,16 +41,14 @@ Nothing is compiled into the package itself: the engine is pure Python
 needs `tqdm` for its progress bars; the GUI needs PyQt6, which is an
 optional install extra so CLI-only installs stay Qt-free.
 
-**Status:** Released — current version **1.2.4**, stated identically in
+**Status:** Released — current version **1.2.5**, stated identically in
 `VERSION`, `setup.py`, and `src/__init__.py` (`__version__`), and matching
-the latest GitHub release (`v1.2.4`). Standalone binaries for Windows and
-Linux are published on the Releases page. A PyPI release is planned but
-**not yet published** — see [Install](#install) and
-[Status and roadmap](#status-and-roadmap). Note that `main` has moved
-ahead of the 1.2.4 tag with unreleased hardening and performance work;
-those items are listed under `[Unreleased]` in
-[CHANGELOG.md](CHANGELOG.md) and are called out as unreleased where this
-README describes them.
+the latest GitHub release ([v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5)). Standalone binaries and portable
+zips for Windows and Linux are published on the Releases page. A PyPI
+release is planned but **not yet published** — see [Install](#install)
+and [Status and roadmap](#status-and-roadmap). The hardening and
+performance work previously listed under `[Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md) shipped in v1.2.5.
 
 ## Features
 
@@ -198,8 +196,8 @@ decompression-bomb cap. The low-level `lz77_compress` / `lz77_decompress`
 
 | Platform | Download |
 |----------|----------|
-| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/VectorZip.exe) |
-| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/VectorZip) |
+| Windows | [VectorZip.exe](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZip.exe) |
+| Linux | [VectorZip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZip) |
 
 These are the windowed desktop app, built by PyInstaller from
 `vectorzip.spec`. (Screenshots: none published — the GUI ships in the
@@ -218,23 +216,23 @@ Get-FileHash VectorZip.exe -Algorithm SHA256
 sha256sum -c SHA256SUMS-linux.txt
 ```
 
-Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.4/SHA256SUMS-linux.txt)
+Checksums: [SHA256SUMS-windows.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/SHA256SUMS-windows.txt) · [SHA256SUMS-linux.txt](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/SHA256SUMS-linux.txt)
 
 ### Portable edition (no install)
 
-**Packaging ready — ships with the next release.** The release
-workflow on `main` now assembles a portable zip for each platform —
-`VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
-(Linux) — containing the standalone binary and
+**Shipped — available since [v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5).** Download
+[VectorZipPortable.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZipPortable.zip)
+(Windows) or
+[VectorZipPortable-linux.zip](https://github.com/TheRealJesusTheHacker/VectorZip/releases/download/v1.2.5/VectorZipPortable-linux.zip)
+(Linux). The release workflow assembles a portable zip for each
+platform, containing the standalone binary and
 `packaging/portable/README-PORTABLE.txt`. Unzip it into any folder
 (including a USB stick), run the app, delete the folder to remove
 it. Nothing is installed and no Python is required.
 
-These portable zips are **not** in the v1.2.4 release assets yet;
-they will be attached starting with the next tagged release, and
-each platform's `SHA256SUMS-*.txt` will cover the portable zip as
-well as the binary. Until then, the standalone binaries above are
-themselves single-file downloads that run without an install.
+These portable zips ship in the v1.2.5 release assets, and each
+platform's `SHA256SUMS-*.txt` covers the portable zip as well as
+the binary.
 
 ### From source
 
@@ -508,7 +506,7 @@ release builds; a plain `pip install .` does not require it).
 | `src/lz77.py` | LZ77 compressor/decompressor: 32 KiB window, greedy 3-byte hash matching, `>HBB` tokens, optional per-call output cap. |
 | `src/huffman.py` | Huffman encoder/decoder (table-driven decode with a 9-bit lookup), plus strict code-table serialization/deserialization for the container format. |
 | `src/compressor.py` | The engine: `compress_file` / `decompress_file`, `expected_output_path`, the workhorse policy, format v1/v2/v3 readers, output-cap enforcement, and all the overwrite/symlink/hardlink safety logic. |
-| `src/__init__.py` | Public API surface and `__version__` (`1.2.4`). |
+| `src/__init__.py` | Public API surface and `__version__` (`1.2.5`). |
 | `main.py` | The `vzip` CLI: argument parsing, tqdm progress bars, cancel/OOM/failure quarantine of partial outputs. |
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log, atomic no-clobber output-folder move, batch duplicate-output planning. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
@@ -544,10 +542,10 @@ The suite is **90 tests**, collected and run from the current tree:
 | `tests/test_compression.py` | 37 | Round trips at every size from empty to multi-chunk, chunk/window boundary conditions, byte-flip and truncation corruption, legacy v1/v2 archives, overwrite refusal, output caps, cancel behavior, torn-input detection, unknown chunk flags. |
 | `tests/test_audit2_concurrency.py` | 17 | GUI worker behavior (with a stubbed PyQt6): atomic no-clobber move, batch duplicate-output planning, quarantine semantics, graceful close. |
 | `tests/test_bughunt2_strictness.py` | 14 | Strictness regressions for malformed inputs and CLI validation. |
-| `tests/test_huffman_table_strictness.py` | 8 | Huffman table rejection cases (zero-length, overlong, overflowing, duplicate) plus the accepted 64-bit boundary and normal round trips. *(Unreleased work on `main`.)* |
+| `tests/test_huffman_table_strictness.py` | 8 | Huffman table rejection cases (zero-length, overlong, overflowing, duplicate) plus the accepted 64-bit boundary and normal round trips. |
 | `tests/test_hardlink_output_safety.py` | 6 | Planted-hardlink overwrite attacks for compress and decompress (victim and input-linked cases), in-place truncation for singly-linked files, CLI quarantine replacing a leftover `.partial`. |
 | `tests/test_symlink_output_safety.py` | 5 | Planted-symlink attacks for compress and decompress in both modes, dangling symlinks, and the legitimate overwrite path. POSIX-only. |
-| `tests/test_huffman_decode_padding.py` | 3 | `huffman_decode` padding validation: negative and oversized padding raise `ValueError`; boundary values still decode. *(Unreleased work on `main`.)* |
+| `tests/test_huffman_decode_padding.py` | 3 | `huffman_decode` padding validation: negative and oversized padding raise `ValueError`; boundary values still decode. |
 
 **Fuzzing.** `tests/fuzz_decompress.py` is stdlib-only: it builds a seed
 corpus of valid archives in all three format versions, then feeds
@@ -593,23 +591,21 @@ signed build-provenance attestations attached to the release.
 
 ## Status and roadmap
 
-- **Current release: 1.2.4** (2026-10-11) — standalone Windows and Linux
-  binaries on the Releases page, with checksums and attestations.
-- **On `main`, unreleased:** the CHANGELOG `[Unreleased]` section lists
-  stricter container/Huffman-table validation (empty table, `pad_bits`,
-  table-entry strictness), CLI `--max-output-gb` validation, and decoder
-  performance work that does not change the on-disk format (LZ77
-  slice/repeat match copies; a 9-bit lookup table in Huffman decode;
-  one parameterized chunk loop for v1/v2/v3; the output-path naming rule
-  unified in `expected_output_path`). Also present in the code and tests
-  on `main` is the hardlink output-safety work described above. These
-  ship with the next version bump; the 1.2.4 binaries predate them.
-- **Portable edition: packaging ready, ships with the next release.**
+- **Current release: 1.2.5** (2026-10-20) — standalone Windows and Linux
+  binaries and portable zips on the Releases page, with checksums and
+  attestations: [v1.2.5](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5).
+- **Shipped in 1.2.5:** stricter container/Huffman-table validation
+  (empty table, `pad_bits`, table-entry strictness), CLI
+  `--max-output-gb` validation, output-path symlink/hardlink hardening,
+  and decoder performance work that does not change the on-disk format
+  (LZ77 slice/repeat match copies; a 9-bit lookup table in Huffman
+  decode; one parameterized chunk loop for v1/v2/v3; the output-path
+  naming rule unified in `expected_output_path`).
+- **Portable edition: shipped with v1.2.5.**
   `VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
-  (Linux) are assembled by the release workflow on `main` (see
-  [Portable edition](#portable-edition-no-install)); they are not in
-  the v1.2.4 assets. The next tagged release is the first that will
-  carry them.
+  (Linux) are assembled by the release workflow and attached to the
+  [v1.2.5 release](https://github.com/TheRealJesusTheHacker/VectorZip/releases/tag/v1.2.5)
+  (see [Portable edition](#portable-edition-no-install)).
 - **PyPI: pending, owner-side.** The trusted-publisher publish workflow
   is in the repo and fires on release publication, but the
   `vectorzip-py` project is not live on PyPI yet — until it is, install
