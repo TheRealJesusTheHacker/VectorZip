@@ -22,21 +22,55 @@ except ImportError:  # running from the repo root
     from src import __version__
 
 # ---------------------------------------------------------------------------
-# Theme
+# Theme — the namesake "blueprint" palette lives in gui/theme.py, the
+# single source of truth, imported here so the stylesheet and the code
+# below share one set of constants.
 # ---------------------------------------------------------------------------
 
-BG = "#0f141b"
-PANEL = "#161d27"
-PANEL_LIGHT = "#1c2431"
-BORDER = "#2a3444"
-TEXT = "#e8eef5"
-TEXT_DIM = "#93a1b5"
-ACCENT = "#38bdf8"  # electric cyan
-ACCENT_DARK = "#0e7490"
-SUCCESS = "#4ade80"
-WARNING = "#fbbf24"
-ERROR = "#f87171"
-MONO = "Consolas, 'SF Mono', Menlo, monospace"
+try:
+    from gui.theme import (
+        ACCENT,
+        ACCENT_DARK,
+        BG,
+        BORDER,
+        DISABLED_TEXT,
+        ERROR,
+        INPUT_BG,
+        MONO,
+        PANEL,
+        PANEL_BORDER,
+        PANEL_LIGHT,
+        PRIMARY,
+        PRIMARY_DARK_TEXT,
+        RED,
+        RED_TEXT,
+        SUCCESS,
+        TEXT,
+        TEXT_DIM,
+        WARNING,
+    )
+except ImportError:  # running inside the gui/ directory
+    from theme import (
+        ACCENT,
+        ACCENT_DARK,
+        BG,
+        BORDER,
+        DISABLED_TEXT,
+        ERROR,
+        INPUT_BG,
+        MONO,
+        PANEL,
+        PANEL_BORDER,
+        PANEL_LIGHT,
+        PRIMARY,
+        PRIMARY_DARK_TEXT,
+        RED,
+        RED_TEXT,
+        SUCCESS,
+        TEXT,
+        TEXT_DIM,
+        WARNING,
+    )
 
 STYLESHEET = f"""
 * {{ font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; }}
@@ -45,10 +79,10 @@ QMainWindow::separator {{ background: {BORDER}; }}
 
 /* Header */
 #brand {{ font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }}
-#brandAccent {{ color: {ACCENT}; }}
+#brandAccent {{ color: {PRIMARY}; }}
 #tagline {{ color: {TEXT_DIM}; font-size: 12px; }}
 #versionBadge {{
-    background: {PANEL_LIGHT}; color: {ACCENT};
+    background: {PANEL_LIGHT}; color: {PRIMARY};
     border: 1px solid {BORDER}; border-radius: 10px;
     padding: 3px 10px; font-size: 11px; font-weight: 600;
 }}
@@ -68,34 +102,34 @@ QPushButton {{
     border: 1px solid {BORDER}; border-radius: 8px;
     padding: 8px 16px; font-weight: 600;
 }}
-QPushButton:hover {{ border-color: {ACCENT}; }}
-QPushButton:pressed {{ background: #232d3d; }}
-QPushButton:disabled {{ color: #5b6a7e; border-color: #232d3d; }}
+QPushButton:hover {{ border-color: {PRIMARY}; }}
+QPushButton:pressed {{ background: {PANEL_BORDER}; }}
+QPushButton:disabled {{ color: {DISABLED_TEXT}; border-color: {BORDER}; }}
 #primaryBtn {{
-    background: {ACCENT}; color: #06202b; border: none;
+    background: {PRIMARY}; color: {PRIMARY_DARK_TEXT}; border: none;
     font-size: 14px; padding: 10px 22px;
 }}
-#primaryBtn:hover {{ background: #7dd3fc; }}
-#primaryBtn:disabled {{ background: #274b5c; color: #7b8fa3; }}
-#dangerBtn {{ border-color: #5c2b2b; color: {ERROR}; }}
-#dangerBtn:hover {{ background: #3a1d1d; border-color: {ERROR}; }}
+#primaryBtn:hover {{ background: {ACCENT}; }}
+#primaryBtn:disabled {{ background: {INPUT_BG}; color: {DISABLED_TEXT}; }}
+#dangerBtn {{ border-color: {RED}; color: {ERROR}; }}
+#dangerBtn:hover {{ background: {RED}; border-color: {RED}; color: {RED_TEXT}; }}
 
 /* Inputs */
 QLineEdit, QComboBox {{
     background: {PANEL_LIGHT}; border: 1px solid {BORDER};
     border-radius: 8px; padding: 7px 10px; color: {TEXT};
 }}
-QLineEdit:focus, QComboBox:focus {{ border-color: {ACCENT}; }}
+QLineEdit:focus, QComboBox:focus {{ border-color: {PRIMARY}; }}
 QComboBox QAbstractItemView {{ background: {PANEL_LIGHT}; selection-background: {ACCENT_DARK}; }}
 QCheckBox {{ spacing: 8px; }}
 QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px; border: 1px solid {BORDER}; background: {PANEL_LIGHT}; }}
-QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
+QCheckBox::indicator:checked {{ background: {PRIMARY}; border-color: {PRIMARY}; }}
 
 /* Queue table */
 QTableWidget {{
     background: {PANEL}; border: 1px solid {BORDER};
     border-radius: 10px; gridline-color: {BORDER};
-    alternate-background-color: #131924; selection-background: #1e3a4c;
+    alternate-background-color: {INPUT_BG}; selection-background: {PANEL_BORDER};
 }}
 QTableWidget::item {{ padding: 6px; }}
 QHeaderView::section {{
@@ -106,27 +140,27 @@ QHeaderView::section {{
 
 /* Drop zone */
 #dropZone {{
-    border: 2px dashed #33506a; border-radius: 10px;
+    border: 2px dashed {BORDER}; border-radius: 10px;
     color: {TEXT_DIM}; font-size: 13px; padding: 18px;
 }}
-#dropZone[dragOver="true"] {{ border-color: {ACCENT}; color: {ACCENT}; background: #12222e; }}
+#dropZone[dragOver="true"] {{ border-color: {PRIMARY}; color: {PRIMARY}; background: {INPUT_BG}; }}
 
 /* Progress */
 QProgressBar {{
     background: {PANEL_LIGHT}; border: 1px solid {BORDER};
     border-radius: 8px; height: 22px; text-align: center; color: {TEXT};
 }}
-QProgressBar::chunk {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {ACCENT_DARK}, stop:1 {ACCENT}); border-radius: 7px; }}
+QProgressBar::chunk {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {ACCENT_DARK}, stop:1 {PRIMARY}); border-radius: 7px; }}
 
 /* Stat cards */
 #statCard {{ background: {PANEL}; border: 1px solid {BORDER}; border-radius: 10px; }}
 #statValue {{ font-size: 20px; font-weight: 800; color: {TEXT}; }}
-#statValueAccent {{ font-size: 20px; font-weight: 800; color: {ACCENT}; }}
+#statValueAccent {{ font-size: 20px; font-weight: 800; color: {PRIMARY}; }}
 #statLabel {{ font-size: 10px; color: {TEXT_DIM}; text-transform: uppercase; letter-spacing: 1px; }}
 
 /* Log */
 QPlainTextEdit {{
-    background: #0b0f15; border: 1px solid {BORDER};
+    background: {INPUT_BG}; border: 1px solid {BORDER};
     border-radius: 10px; font-family: {MONO}; font-size: 12px;
     padding: 8px;
 }}
@@ -135,7 +169,7 @@ QTabBar::tab {{
     background: transparent; color: {TEXT_DIM};
     padding: 8px 18px; font-weight: 600;
 }}
-QTabBar::tab:selected {{ color: {ACCENT}; border-bottom: 2px solid {ACCENT}; }}
+QTabBar::tab:selected {{ color: {PRIMARY}; border-bottom: 2px solid {PRIMARY}; }}
 QStatusBar {{ color: {TEXT_DIM}; font-size: 11px; }}
 """
 
@@ -828,7 +862,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         # file named "<b>..." can't inject markup into the activity log.
         safe = html.escape(message)
         cursor.insertHtml(
-            f'<span style="color:#5b6a7e">[{stamp}]</span> '
+            f'<span style="color:{DISABLED_TEXT}">[{stamp}]</span> '
             f'<span style="color:{colors.get(kind, TEXT_DIM)}">{safe}</span><br>'
         )
         self.log.setTextCursor(cursor)
