@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Portable edition packaging: the release workflow now assembles
+  `VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
+  (Linux) — the standalone binary plus
+  `packaging/portable/README-PORTABLE.txt`, built by
+  `packaging/portable/build-portable.py` — and attaches them to the
+  release with checksums and build-provenance attestations covering
+  the zips. No installer, no Python required. These zips first ship
+  with the next tagged release; they are not in the 1.2.4 assets.
+
 ### Security
 - The container reader now rejects two coded-chunk shapes the encoder
   could never have written: a chunk whose Huffman table is empty (its
