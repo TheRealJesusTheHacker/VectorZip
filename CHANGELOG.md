@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] — 2026-10-20
+
+**The portable release.** This release's headline is packaging: the
+portable editions — `VectorZipPortable.zip` (Windows) and
+`VectorZipPortable-linux.zip` (Linux) — ship as release assets for
+the first time, alongside the standalone binaries and per-platform
+`SHA256SUMS-*.txt` checksums covering the zips. It also carries the
+real product work merged since v1.2.4 and previously listed under
+Unreleased: stricter container/Huffman validation, output-path
+symlink/hardlink hardening, CLI/GUI fixes, and decoder performance
+work that does not change the on-disk format.
+
 ### Added
 - Portable edition packaging: the release workflow now assembles
   `VectorZipPortable.zip` (Windows) and `VectorZipPortable-linux.zip`
@@ -14,8 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `packaging/portable/README-PORTABLE.txt`, built by
   `packaging/portable/build-portable.py` — and attaches them to the
   release with checksums and build-provenance attestations covering
-  the zips. No installer, no Python required. These zips first ship
-  with the next tagged release; they are not in the 1.2.4 assets.
+  the zips. No installer, no Python required. These zips ship for
+  the first time in this release (v1.2.5); they were not in the
+  1.2.4 assets.
 
 ### Security
 - The container reader now rejects two coded-chunk shapes the encoder
@@ -27,11 +40,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produced by any released version is affected — every writer emits
   coded chunks only for non-empty input (non-empty table) and computes
   `pad_bits` as `(8 - nbits % 8) % 8`.
+- Output-path hardening on overwrite: a planted symlink at the output
+  path is no longer followed, and a planted hard link can no longer
+  cause the linked file (including the input file itself) to be
+  clobbered on overwrite.
+- `huffman_decode` now rejects out-of-range padding with `ValueError`
+  (previously an `IndexError` for negative values and silent
+  truncation for oversized values).
 
 ### Fixed
 - CLI: `--max-output-gb` values that are NaN, infinite, or too large
   to convert to a byte count now fail argument validation (exit 2)
   instead of escaping it and surfacing as a mid-operation error.
+
+- CLI quarantine now uses `os.replace`, so a leftover `.partial`
+  cannot strand a half-written output under its good name (GUI parity).
+- CLI and GUI progress no longer exceed 100% on decompress, and a
+  failed GUI output-folder move no longer quarantines the completed
+  archive.
 
 ### Performance
 - `lz77_decompress` copies matches with slice/repeat operations and
