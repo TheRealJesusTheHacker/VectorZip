@@ -338,7 +338,25 @@ class JobWorker(QtCore.QObject):
                         try:
                             _move_noclobber(out, dest, self.overwrite)
                         except FileExistsError:
-                            raise  # refusal semantics: handled below
+                            # Refusal semantics, like the generic move
+                            # failure below: the archive at `out` is
+                            # COMPLETE — only the move was refused
+                            # because the output folder already holds a
+                            # file with that name. Quarantining it as a
+                            # .partial (the generic handler) would brand
+                            # a valid archive as a failed partial, and a
+                            # bare "Output exists" would hide where the
+                            # finished file actually is. Report the
+                            # refusal and name the kept location.
+                            self.file_done.emit(
+                                path,
+                                False,
+                                "Output exists in the output folder "
+                                f"(not overwritten); finished file kept at {out}",
+                                0,
+                                0,
+                            )
+                            continue
                         except Exception as move_err:
                             # The archive at `out` is COMPLETE — only the
                             # move into out_dir failed. Quarantining it as
@@ -403,6 +421,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         self._worker = None
         self._start_time = None
         self._closing = False
+        self._cancel_requested = False
         self._stats = {"files": 0, "in": 0, "out": 0}
 
         self._build_ui()
@@ -743,6 +762,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
             )
 
         self._stats = {"files": 0, "in": 0, "out": 0}
+        self._cancel_requested = False
         self._update_stats()
         self._start_time = time.time()
         self._log(f"Starting {mode}ion of {len(jobs)} file(s)…", "info")
@@ -779,6 +799,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
                 event.ignore()
                 return
             self._log("Cancelling running jobs before exit…", "warn")
+            self._cancel_requested = True
             if self._worker is not None:
                 self._worker.cancelled = True
             self._closing = True
@@ -794,6 +815,7 @@ class VectorZipWindow(QtWidgets.QMainWindow):
     def _cancel(self):
         if self._worker:
             self._worker.cancelled = True
+            self._cancel_requested = True
             self._log("Cancelling…", "warn")
 
     def _on_progress(self, done, total, label):
@@ -830,9 +852,19 @@ class VectorZipWindow(QtWidgets.QMainWindow):
 
     def _on_finished(self):
         elapsed = time.time() - (self._start_time or time.time())
-        self.bar.setValue(100)
-        self.prog_label.setText(f"Finished in {elapsed:.1f}s")
-        self._log(f"Batch finished in {elapsed:.1f}s — {self._stats['files']} file(s) OK.", "info")
+        if self._cancel_requested:
+            # A cancelled batch is not a finished one: don't jump the
+            # bar to 100% or claim completion for work that was
+            # stopped on purpose.
+            self.prog_label.setText(f"Cancelled after {elapsed:.1f}s")
+            self._log(
+                f"Batch cancelled in {elapsed:.1f}s — {self._stats['files']} file(s) OK.",
+                "warn",
+            )
+        else:
+            self.bar.setValue(100)
+            self.prog_label.setText(f"Finished in {elapsed:.1f}s")
+            self._log(f"Batch finished in {elapsed:.1f}s — {self._stats['files']} file(s) OK.", "info")
         self.statusBar().showMessage("Ready")
         self._thread = None
         self._worker = None

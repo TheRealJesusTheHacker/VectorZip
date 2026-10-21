@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] — 2026-10-21
+
+**GUI honesty fixes** (fleet sweep #3). No engine, format, or CLI change.
+
+### Fixed
+- A cancelled batch no longer reports success it didn't earn: the
+  completion path jumped the progress bar to 100% and announced
+  "Finished" even when the user had cancelled. It now reads
+  "Cancelled after …", keeps the bar where the work stopped, and
+  logs the batch as cancelled (the files completed before the
+  cancel are still counted).
+- When a finished file could not be moved into the chosen output
+  folder because a file with that name already existed there, the
+  result was a bare "Output exists" that never said the finished
+  file had been kept — every other move failure already named the
+  kept location. The refusal now names it too.
+
+### Tests
+- New `tests/test_gui_finished_state.py`: subprocess probes against
+  real PyQt6 (cancelled vs completed completion state, and the
+  move-refusal message with the kept file verified on disk). Suite:
+  107 passed in the Qt environment.
+
+
 ## [1.2.7] — 2026-10-20
 
 **The namesake palette release.** VectorZip's GUI gets the identity its
