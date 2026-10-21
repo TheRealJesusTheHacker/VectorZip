@@ -30,8 +30,7 @@ import unittest
 
 REPO_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
-_PROBE = textwrap.dedent(
-    """
+_PROBE = textwrap.dedent("""
     import os, sys, time
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, {root!r})
@@ -79,8 +78,7 @@ _PROBE = textwrap.dedent(
             assert (src + ".vzip") in detail, detail
             assert os.path.exists(src + ".vzip")
     print("PROBE OK")
-    """
-)
+    """)
 
 
 def _qt_available():

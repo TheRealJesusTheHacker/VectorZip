@@ -864,7 +864,9 @@ class VectorZipWindow(QtWidgets.QMainWindow):
         else:
             self.bar.setValue(100)
             self.prog_label.setText(f"Finished in {elapsed:.1f}s")
-            self._log(f"Batch finished in {elapsed:.1f}s — {self._stats['files']} file(s) OK.", "info")
+            self._log(
+                f"Batch finished in {elapsed:.1f}s — {self._stats['files']} file(s) OK.", "info"
+            )
         self.statusBar().showMessage("Ready")
         self._thread = None
         self._worker = None
