@@ -120,7 +120,7 @@ QLineEdit, QComboBox {{
     border-radius: 8px; padding: 7px 10px; color: {TEXT};
 }}
 QLineEdit:focus, QComboBox:focus {{ border-color: {PRIMARY}; }}
-QComboBox QAbstractItemView {{ background: {PANEL_LIGHT}; selection-background: {ACCENT_DARK}; }}
+QComboBox QAbstractItemView {{ background: {PANEL_LIGHT}; selection-background-color: {ACCENT_DARK}; }}
 QCheckBox {{ spacing: 8px; }}
 QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px; border: 1px solid {BORDER}; background: {PANEL_LIGHT}; }}
 QCheckBox::indicator:checked {{ background: {PRIMARY}; border-color: {PRIMARY}; }}
@@ -129,7 +129,7 @@ QCheckBox::indicator:checked {{ background: {PRIMARY}; border-color: {PRIMARY}; 
 QTableWidget {{
     background: {PANEL}; border: 1px solid {BORDER};
     border-radius: 10px; gridline-color: {BORDER};
-    alternate-background-color: {INPUT_BG}; selection-background: {PANEL_BORDER};
+    alternate-background-color: {INPUT_BG}; selection-background-color: {PANEL_BORDER};
 }}
 QTableWidget::item {{ padding: 6px; }}
 QHeaderView::section {{

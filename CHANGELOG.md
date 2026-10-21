@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- GUI stylesheet: corrected the invalid Qt property `selection-background`
+  to the valid `selection-background-color` in `gui/main_window.py` (combo-box
+  dropdown and queue table). Qt ignored the invalid property, so selected rows
+  rendered Qt's default blue instead of the theme's declared colours.
+
 ## [1.2.8] — 2026-10-21
 
 **GUI honesty fixes** (fleet sweep #3). No engine, format, or CLI change.
