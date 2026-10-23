@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] — 2026-10-23
+
 ### Fixed
 - GUI stylesheet: corrected the invalid Qt property `selection-background`
   to the valid `selection-background-color` in `gui/main_window.py` (combo-box

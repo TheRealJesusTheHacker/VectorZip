@@ -8,7 +8,7 @@ Usage:
     from vectorzip import compress_file, decompress_file
 
 Attributes:
-    __version__ (str): 1.2.8
+    __version__ (str): 1.2.9
 """
 
 from .lz77 import lz77_compress, lz77_decompress
@@ -25,4 +25,4 @@ __all__ = [
     'decompress_file',
 ]
 
-__version__ = '1.2.8'
+__version__ = '1.2.9'
