@@ -16,8 +16,9 @@ Use it from anywhere
 --------------------
 Unzip this file into any folder you control - a folder on your PC
 or a USB stick for field work - and run the app from there. To
-remove VectorZip, delete the unzipped files; nothing else was
-added to your system by the portable edition.
+remove VectorZip, delete the unzipped files; the only other thing it leaves behind is the
+app's own window settings in your platform settings store
+(Qt QSettings), as described in the main README.
 
 What it does
 ------------

@@ -4,7 +4,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/TheRealJesusTheHacker/VectorZip/ci.yml?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.2.9-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
-[![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
+[![Tests](https://img.shields.io/badge/tests-107%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/blob/main/setup.py)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green?style=flat-square)](LICENSE)
 
@@ -55,7 +55,7 @@ performance work previously listed under `[Unreleased]` in
 ### Compression engine
 
 - **Completely lossless** — byte-identical round trips, covered by a
-  97-test suite and a stdlib-only decompressor fuzzer that runs in CI
+  107-test suite and a stdlib-only decompressor fuzzer that runs in CI
   (see [Development and testing](#development-and-testing)).
 - **Fast on real data, instant on junk** — incompressible chunks are
   detected and stored raw instead of being force-compressed, so random or
@@ -87,12 +87,11 @@ performance work previously listed under `[Unreleased]` in
   before any checksum runs, so table entries the encoder could never
   have written are rejected with `ValueError`: zero-length codes, codes
   longer than 64 bits, code values that overflow their declared bit
-  length, and symbols listed twice. *(Partly on `main` as unreleased
-  work — see CHANGELOG `[Unreleased]`.)*
+  length, and symbols listed twice. *(Shipped in v1.2.5.)*
 - **Impossible coded chunks rejected** — a coded chunk with an empty
   Huffman table, or `pad_bits` greater than 7 (padding lives inside the
   final encoded byte, so 0–7 are the only legal values), fails with
-  `ValueError`. *(Unreleased on `main`.)*
+  `ValueError`. *(Shipped in v1.2.5.)*
 - **Torn-input detection** — `compress_file` fingerprints the input
   (inode, size, mtime) before and after the read; if anything changed it
   mid-job (concurrent writer, truncation, replacement), it raises
@@ -143,7 +142,7 @@ The full model, including its platform limits, is under
 - `--max-output-gb`, `--no-output-limit`, `--force` — the same safety
   controls as the library. `--max-output-gb` values that are NaN,
   infinite, or too large to convert to a byte count fail argument
-  validation up front *(unreleased on `main`)*.
+  validation up front (shipped in v1.2.5).
 
 ### Desktop GUI
 
@@ -521,7 +520,7 @@ release builds; a plain `pip install .` does not require it).
 | `gui/` | The PyQt6 desktop app: main window, worker thread, queue table, stat cards, styled log, atomic no-clobber output-folder move, batch duplicate-output planning. |
 | `gui_launcher.py` | `vectorzip-gui` entry point. |
 | `vectorzip.spec` | PyInstaller spec for the standalone release binaries (windowed, no console). |
-| `tests/` | The pytest suite — 97 tests across eight files; see [Development and testing](#development-and-testing). |
+| `tests/` | The pytest suite — 107 tests across ten files; see [Development and testing](#development-and-testing). |
 | `tests/fuzz_decompress.py` | Stdlib-only decompressor fuzzer (also runs in CI). |
 | `tests/benchmark.py` | Dev-only throughput benchmark harness. |
 | `docs/compression.md` | Algorithm and container-format documentation for v1/v2/v3. |
@@ -542,10 +541,10 @@ release builds; a plain `pip install .` does not require it).
 git clone https://github.com/TheRealJesusTheHacker/VectorZip
 cd VectorZip
 pip install -r requirements-dev.txt   # pytest (pinned) + runtime deps
-python -m pytest tests/ -q            # 97 tests
+python -m pytest tests/ -q            # 107 tests
 ```
 
-The suite is **97 tests**, collected and run from the current tree:
+The suite is **107 tests**, collected and run from the current tree:
 
 | File | Tests | Covers |
 |---|---|---|
@@ -557,6 +556,8 @@ The suite is **97 tests**, collected and run from the current tree:
 | `tests/test_symlink_output_safety.py` | 5 | Planted-symlink attacks for compress and decompress in both modes, dangling symlinks, and the legitimate overwrite path. POSIX-only. |
 | `tests/test_kithunt_windows.py` | 7 | Windows-shaped regressions: planted-symlink overwrite with `O_NOFOLLOW` absent, `O_BINARY` requested on every raw-fd output open, GUI worker signals carrying 64-bit byte counts (live PyQt6 probe). |
 | `tests/test_huffman_decode_padding.py` | 3 | `huffman_decode` padding validation: negative and oversized padding raise `ValueError`; boundary values still decode. |
+| `tests/test_gui_finished_state.py` | 3 | GUI completion-state honesty (real PyQt6 subprocess probes): a cancelled batch reads "Cancelled" and keeps its real progress instead of landing on a 100% "Finished" state, and a move refusal names the kept file and where it was kept. |
+| `tests/test_gui_theme.py` | 7 | Namesake "blueprint" palette pins: theme constants and alias wiring, the no-purple rule, and WCAG ≥4.5:1 contrast for every rendered text/background pair. |
 
 **Fuzzing.** `tests/fuzz_decompress.py` is stdlib-only: it builds a seed
 corpus of valid archives in all three format versions, then feeds
