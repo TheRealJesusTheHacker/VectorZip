@@ -4,7 +4,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/TheRealJesusTheHacker/VectorZip/ci.yml?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.2.9-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/releases/latest)
-[![Tests](https://img.shields.io/badge/tests-107%20passing-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
+[![Tests](https://img.shields.io/badge/tests-103%20passed%2C%204%20skipped-brightgreen?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/tree/main/tests)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square)](https://github.com/TheRealJesusTheHacker/VectorZip/blob/main/setup.py)
 [![License](https://img.shields.io/badge/license-MPL--2.0-green?style=flat-square)](LICENSE)
 
