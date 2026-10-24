@@ -7,6 +7,15 @@ that overflows its declared bit length, or a duplicated symbol are
 hand-crafted by definition — serialize_table writes dict entries with
 1 <= bitlen and value < 2**bitlen — so they raise ValueError instead of
 being silently reinterpreted into a different decode tree.
+
+Fleet Sweep #5 added the code-space half of that rule: the encoder's
+tables are always prefix-free, so a code that duplicates another
+entry's code, or that is a prefix of (or has as a prefix) another
+entry's code, is hand-crafted too. Before the fix such a table was
+accepted and silently reinterpreted — a duplicated code decoded to
+whichever symbol was inserted last, and a prefix code shadowed the
+longer code entirely. huffman_decode applies the same refusal to
+tables handed to it directly, matching its padding contract.
 """
 
 import os
@@ -57,6 +66,52 @@ class TestDeserializeTableStrictness(unittest.TestCase):
         blob = _entry(65, 1, b'\x00') + _entry(65, 1, b'\x01')
         with self.assertRaises(ValueError):
             deserialize_table(blob)
+
+    def test_duplicate_code_rejected(self):
+        # Two symbols, one code ('0'): individually well-formed entries
+        # whose code assignment the encoder could never produce.
+        blob = _entry(65, 1, b'\x00') + _entry(66, 1, b'\x00')
+        with self.assertRaises(ValueError):
+            deserialize_table(blob)
+
+    def test_prefix_code_rejected_short_first(self):
+        # '0' for A, then '01' for B: B's code has A's as a prefix.
+        blob = _entry(65, 1, b'\x00') + _entry(66, 2, b'\x01')
+        with self.assertRaises(ValueError):
+            deserialize_table(blob)
+
+    def test_prefix_code_rejected_long_first(self):
+        # Same conflict, opposite entry order: '01' first, then '0'.
+        blob = _entry(66, 2, b'\x01') + _entry(65, 1, b'\x00')
+        with self.assertRaises(ValueError):
+            deserialize_table(blob)
+
+    def test_decode_rejects_conflicting_table_directly(self):
+        # huffman_decode is public API (the padding tests' precedent):
+        # a conflicting table handed to it directly raises ValueError,
+        # never a silently shadowed decode.
+        from src.huffman import huffman_decode
+
+        for table in ({65: '0', 66: '0'}, {65: '0', 66: '01'}, {66: '01', 65: '0'}):
+            with self.assertRaises(ValueError, msg=repr(table)):
+                huffman_decode(b'\x00', 7, table)
+
+    def test_crafted_archive_with_duplicate_code_table_rejected(self):
+        # End-to-end: a v3 archive whose chunk table assigns one code
+        # to two symbols must fail with ValueError, not decode.
+        table_blob = _entry(65, 1, b'\x00') + _entry(66, 1, b'\x00')
+        chk = zlib.crc32(b'x') & 0xFFFFFFFF
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'evil.vzip')
+            with open(path, 'wb') as f:
+                f.write(b'VZP3')
+                f.write(_HEADER_V2.pack(chk, len(table_blob), 0, 0))
+                f.write(table_blob)
+                f.write(_DATA_HEADER.pack(1))
+                f.write(b'\x00')
+                f.write(_HEADER_V2.pack(0, 0, 0, _FLAG_END))
+            with self.assertRaises(ValueError):
+                decompress_file(path)
 
     def test_truncated_entry_still_rejected(self):
         with self.assertRaises(ValueError):

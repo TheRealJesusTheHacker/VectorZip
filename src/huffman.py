@@ -86,6 +86,12 @@ def huffman_decode(encoded_data, padding, table):
     # of the format code uses.
     if not 0 <= padding <= 7:
         raise ValueError('corrupt file: invalid Huffman padding')
+    # The table must really be prefix-free, as the encoder's always is:
+    # a code that duplicates another, or that is a prefix of (or has as
+    # a prefix) another code, makes the longer code unreachable or the
+    # shorter one ambiguous, and used to be silently reinterpreted —
+    # it is now refused up front with the corrupt-input contract.
+    _check_prefix_free(table.values(), 'corrupt file: invalid Huffman code table')
     # Compile the prefix-free code table into a decode tree.
     # Internal nodes: {'0': child, '1': child}; leaves: {'sym': byte}.
     root = {}
@@ -173,6 +179,33 @@ def huffman_decode(encoded_data, padding, table):
     return bytes(decoded)
 
 
+def _check_prefix_free(codes, message):
+    """Raise ``ValueError(message)`` unless ``codes`` is prefix-free.
+
+    Every code must be a non-empty string of '0'/'1' bits, no code may
+    duplicate another, and no code may be a prefix of another. Checked
+    with interval arithmetic: left-aligned in a field as wide as the
+    longest code, each code covers the range of field values it is a
+    prefix of, and two codes conflict exactly when their ranges
+    overlap — one sort (C speed) plus one pass over at most 256 ranges,
+    so valid tables pay almost nothing for the check.
+    """
+    codes = list(codes)
+    for code in codes:
+        if not isinstance(code, str) or not code or code.strip('01'):
+            raise ValueError(message)
+    if len(codes) < 2:
+        return
+    width = max(len(code) for code in codes)
+    ranges = sorted(
+        (int(code, 2) << (width - len(code)), (int(code, 2) + 1) << (width - len(code)))
+        for code in codes
+    )
+    for (_, end), (start, _) in zip(ranges, ranges[1:]):
+        if start < end:
+            raise ValueError(message)
+
+
 def serialize_table(table):
     """Serialize a Huffman table to bytes.
 
@@ -205,8 +238,10 @@ def deserialize_table(buf):
     hostile) input file, so entries :func:`serialize_table` could never
     have written — a zero-length code, a code longer than
     ``_MAX_CODE_BITS``, a code value that does not fit in its declared
-    bit length, or a symbol listed twice — are rejected with
-    ``ValueError`` instead of being silently reinterpreted.
+    bit length, a symbol listed twice, or a code that duplicates or
+    prefix-conflicts with another entry's code (the encoder's tables
+    are always prefix-free) — are rejected with ``ValueError`` instead
+    of being silently reinterpreted.
     """
     table = {}
     i, n = 0, len(buf)
@@ -227,4 +262,7 @@ def deserialize_table(buf):
         if symbol in table:
             raise ValueError('corrupt Huffman table: duplicate symbol')
         table[symbol] = bin(val)[2:].zfill(bitlen)
+    _check_prefix_free(
+        table.values(), 'corrupt Huffman table: duplicate or prefix-conflicting code'
+    )
     return table

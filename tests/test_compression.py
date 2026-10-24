@@ -114,6 +114,30 @@ class TestLz77(unittest.TestCase):
         data = bytes(range(256)) * 256  # 64 KiB, a full legit chunk
         self.assertEqual(lz77_decompress(lz77_compress(data), max_out=131072), data)
 
+    def test_compress_output_is_byte_stable(self):
+        # Golden-output pin for the Fleet Sweep #5 match-extension
+        # speedup: extending a match in doubling slices must emit the
+        # exact token stream the original byte-by-byte loop emitted.
+        # These hashes were recorded from the pre-speedup code; any
+        # change to the emitted tokens — not just a round-trip break —
+        # fails here, because the on-disk format is the token stream.
+        import hashlib
+
+        cases = [
+            (
+                (b'VectorZip - high performance compression test. ' * 1500)[:65536],
+                '235ba016fac786b363bf935bfba2ce9e08e5e8dfc610603314ffaeaacc51e707',
+            ),
+            (
+                (b'the quick brown fox jumps over the lazy dog. ' * 1600)[:65536],
+                'ff389a377349e10e7061034383f732c02be834c88e846051b059375fa6386e13',
+            ),
+        ]
+        for data, expected_sha in cases:
+            out = lz77_compress(data)
+            self.assertEqual(hashlib.sha256(out).hexdigest(), expected_sha)
+            self.assertEqual(lz77_decompress(out), data)
+
 
 class TestHuffman(unittest.TestCase):
     def _rt(self, data):

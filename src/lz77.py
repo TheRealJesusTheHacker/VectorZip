@@ -18,6 +18,10 @@ _TOKEN = struct.Struct('>HBB')
 _WINDOW = 32768
 _MIN_MATCH = 3
 _MAX_MATCH = 255
+# A match that reaches this length switches from byte-by-byte extension
+# to slice extension (see lz77_compress): long enough that the slice
+# setup is repaid, short enough that short matches never pay it.
+_SLICE_FROM = _MIN_MATCH + 5
 
 
 def lz77_compress(data):
@@ -41,8 +45,35 @@ def lz77_compress(data):
                 if dist <= _WINDOW:
                     max_len = min(_MAX_MATCH, n - i)
                     match_len = _MIN_MATCH
-                    while match_len < max_len and data[j + match_len] == data[i + match_len]:
+                    # Extend byte-by-byte while the match is short (the
+                    # common case), then in doubling slices compared at
+                    # C speed once the match has proven long. The slice
+                    # steps compute exactly the length the byte loop
+                    # would, so the emitted tokens are unchanged — this
+                    # is a speed change only, never a format change.
+                    while (
+                        match_len < _SLICE_FROM
+                        and match_len < max_len
+                        and data[j + match_len] == data[i + match_len]
+                    ):
                         match_len += 1
+                    if match_len == _SLICE_FROM and match_len < max_len:
+                        step = 16
+                        while match_len < max_len:
+                            s = min(step, max_len - match_len)
+                            if (
+                                data[j + match_len : j + match_len + s]
+                                == data[i + match_len : i + match_len + s]
+                            ):
+                                match_len += s
+                                step = min(step * 2, 128)
+                            else:
+                                while (
+                                    match_len < max_len
+                                    and data[j + match_len] == data[i + match_len]
+                                ):
+                                    match_len += 1
+                                break
                     if i + match_len < n:
                         best_len, best_dist = match_len, dist
                     elif match_len > _MIN_MATCH:

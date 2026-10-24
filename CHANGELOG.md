@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.10] — 2026-10-24
+
+**Fleet Sweep #5: decoder strictness, a byte-identical speedup, and a
+pinned build backend.** No format change: archives written by any
+earlier version decompress exactly as before, and 1.2.10 writes the
+same token stream the previous compressor wrote (see the golden-hash
+pin under Tests).
+
+### Security
+- Huffman code tables that duplicate a code, or in which one code is a
+  prefix of another, are now rejected with `ValueError`. The encoder's
+  tables are always prefix-free, so such a table is hand-crafted by
+  definition; before this fix it was silently reinterpreted — a
+  duplicated code decoded to whichever symbol was inserted last, and a
+  prefix code shadowed the longer code entirely. The refusal applies
+  both where the container reader parses the table
+  (`deserialize_table`) and in `huffman_decode` itself, the format's
+  public decoding API.
+
+### Performance
+- LZ77 match extension now runs byte-by-byte only while a match is
+  short, then in doubling slices compared at C speed once the match
+  has proven long. The slice steps compute exactly the length the byte
+  loop would, so the emitted tokens — and therefore the compressed
+  bytes and the on-disk format — are unchanged. Measured on this
+  machine (process time, best of repeated runs): repetitive text
+  (4.7 MB) compresses about 4× faster and a single-byte run (2 MB)
+  about 4× faster; structured log data (3.2 MB) about 10% faster at
+  the chunk level; a synthetic corpus of nothing but short word
+  matches runs about 8% slower (the per-match bound check is its only
+  cost there). Decompression is unchanged apart from the table check
+  above, which costs under a tenth of a millisecond per chunk.
+
+### CI / supply chain
+- `publish-pypi.yml`: the build backend install is pinned —
+  `pip==25.3` and `build==1.3.0` — instead of the previous unpinned
+  `pip install --upgrade pip build` (flagged by Fleet Sweep #4). Every
+  other install in the workflows was already pinned. PyPI publishing
+  itself remains planned, not published: the project does not exist
+  yet and creating it is the owner's step.
+
+### Tests
+- Suite: 113 passed in the Qt environment (was 107). New:
+  `test_huffman_table_strictness.py` gains five tests (duplicate code,
+  prefix conflicts in both entry orders, the same refusals through
+  `huffman_decode` directly, and a crafted archive end-to-end), and
+  `test_compression.py` gains the LZ77 golden-output test pinning the
+  speedup's byte-identical token stream against hashes recorded from
+  the pre-speedup code.
+
 ## [1.2.9] — 2026-10-23
 
 ### Fixed
