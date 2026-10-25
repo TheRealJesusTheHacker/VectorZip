@@ -20,8 +20,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller==6.22.3
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --require-hashes -r requirements-build.lock.txt
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm vectorzip.spec
       - name: Frozen app start smoke (offscreen Qt)
@@ -76,8 +76,8 @@ jobs:
           sudo apt-get install -y -qq libgl1 libegl1 libxkbcommon0 libdbus-1-3
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller==6.22.3
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --require-hashes -r requirements-build.lock.txt
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm vectorzip.spec
       - name: Assemble the portable edition

@@ -1,0 +1,14 @@
+# Publish tooling pins for the PyPI publish workflow
+# (publish-pypi.yml): the pip upgrade and the `build` frontend used to
+# build the sdist/wheel.
+#
+# EXACT versions on purpose — these are the pins the workflow
+# previously installed inline as
+# `python -m pip install --upgrade "pip==25.3" "build==1.3.0"`.
+# Install them hash-verified via the sibling lock:
+#
+#   python -m pip install --upgrade --require-hashes -r requirements-publish.lock.txt
+#
+# Regenerate the lock after any deliberate bump (see REQUIRE-HASHES.md).
+pip==25.3
+build==1.3.0

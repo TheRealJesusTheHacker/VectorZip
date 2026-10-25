@@ -1,0 +1,13 @@
+# Lint/format tooling pins for the CI lint job (ci.yml): ruff + black,
+# configured by pyproject.toml ([tool.ruff] / [tool.black]).
+#
+# EXACT versions on purpose — these are the pins the workflow
+# previously installed inline as
+# `pip install "ruff==0.17.0" "black==26.10.1"`. Install them
+# hash-verified via the sibling lock:
+#
+#   pip install --require-hashes -r requirements-lint.lock.txt
+#
+# Regenerate the lock after any deliberate bump (see REQUIRE-HASHES.md).
+ruff==0.17.0
+black==26.10.1

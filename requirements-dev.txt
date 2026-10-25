@@ -1,2 +1,7 @@
+# Dev dependencies. Hash-verified installs use the sibling lock
+# (fleet --require-hashes policy, 2026-10-25):
+#   pip install --require-hashes -r requirements-dev.lock.txt
+# This file stays the human-edited pin source; after any deliberate
+# bump here, regenerate the lock before landing (REQUIRE-HASHES.md).
 -r requirements.txt
 pytest==9.1.1

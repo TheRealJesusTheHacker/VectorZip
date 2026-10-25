@@ -249,6 +249,15 @@ pip install .          # CLI + library (installs tqdm; Qt-free)
 pip install .[gui]     # + the desktop GUI (adds PyQt6)
 ```
 
+For a hash-verified install of the same dependency set (the way CI
+and the releases install it — fleet `--require-hashes` policy, see
+`REQUIRE-HASHES.md`):
+
+```bash
+pip install --require-hashes -r requirements.lock.txt   # runtime deps, hash-verified
+pip install --no-deps .                               # CLI + library + GUI entry points
+```
+
 This installs the `vectorzip` package and the `vzip` command-line tool;
 the `[gui]` extra adds the `vectorzip-gui` desktop app launcher and its
 PyQt6 dependency. Requires Python 3.8+. Without installing, the CLI and
@@ -506,7 +515,11 @@ console scripts `vzip` and `vectorzip-gui`, the `[gui]` extra), and
 lint/format style in `pyproject.toml` (black and ruff, 100-column lines,
 single-quote-preserving). Runtime pins live in `requirements.txt`
 (`tqdm==4.70.1`, `PyQt6==6.11.0` — the latter is for the GUI and the
-release builds; a plain `pip install .` does not require it).
+release builds; a plain `pip install .` does not require it). Every
+project-controlled install (CI, release, publish, lint, and the
+development setup above) goes through the sibling `*.lock.txt`
+hash locks with `--require-hashes` — see `REQUIRE-HASHES.md` for
+the inventory, regeneration, and the bounded exceptions.
 
 ## Components
 
@@ -540,7 +553,7 @@ release builds; a plain `pip install .` does not require it).
 ```bash
 git clone https://github.com/TheRealJesusTheHacker/VectorZip
 cd VectorZip
-pip install -r requirements-dev.txt   # pytest (pinned) + runtime deps
+pip install --require-hashes -r requirements-dev.lock.txt   # pytest + runtime deps, hash-verified
 python -m pytest tests/ -q            # 113 tests
 ```
 
@@ -589,7 +602,8 @@ versions and the `pyproject.toml` style config. CodeQL analysis runs via
 **Building the standalone app:**
 
 ```bash
-pip install -r requirements.txt pyinstaller
+pip install --require-hashes -r requirements.lock.txt
+pip install --require-hashes -r requirements-build.lock.txt   # PyInstaller, hash-verified
 pyinstaller --noconfirm vectorzip.spec   # -> dist/VectorZip(.exe)
 ```
 

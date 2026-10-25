@@ -1,0 +1,12 @@
+# Build tooling pins: PyInstaller, used by the CI frozen-app smoke
+# (ci.yml test-windows job) and by both release jobs (release.yml) to
+# build the standalone binaries from vectorzip.spec.
+#
+# EXACT version on purpose — this is the pin the workflows previously
+# installed inline as `pip install pyinstaller==6.22.3`. Install it
+# hash-verified via the sibling lock:
+#
+#   pip install --require-hashes -r requirements-build.lock.txt
+#
+# Regenerate the lock after any deliberate bump (see REQUIRE-HASHES.md).
+pyinstaller==6.22.3
