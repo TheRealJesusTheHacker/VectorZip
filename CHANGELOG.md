@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.12] — 2026-10-25
+
+**Publish-pipeline security patch release.** No format change
+and no behaviour change: archives written by any earlier
+version decompress exactly as before, and 1.2.12 writes the
+same format the previous compressor wrote. No shipped code
+changed in this release.
+
+### Security
+- `pip` 25.3 → 26.2 in the publish install set only
+  (`requirements-publish.txt` and
+  `requirements-publish.lock.txt`) — the set the PyPI publish
+  workflow installs before it builds. The bump clears five
+  pip GHSAs whose first patched version is ≤ 26.2:
+  GHSA-qwm4-qh6w-59xr (CVE-2026-13346), GHSA-wf93-45jw-7689
+  (CVE-2026-8643), GHSA-jp4c-xjxw-mgf9 (CVE-2026-6357),
+  GHSA-58qw-9mgm-455v (CVE-2026-3219), and
+  GHSA-6vgw-5pg2-w6jp (CVE-2026-1703). The regenerated lock
+  is byte-identical to an independent `pip-compile`
+  regeneration; a clean `--require-hashes` install from the
+  merged lock and a corrupted-hash tamper test both behave
+  as required (Fleet Sweep #6, Lane 1 proof record).
+
+### Tests
+- Suite unchanged (no shipped code touched). In the sweep's
+  VM: 109 passed, 1 skipped, 3 failed — the 3 failures are
+  `tests/test_gui_finished_state.py` cases failing on a
+  missing system `libEGL.so.1` in that VM, identical on the
+  pre-merge tree in the same environment.
+
 ## [1.2.11] — 2026-10-25
 
 **Supply-chain patch release.** No format change and no
