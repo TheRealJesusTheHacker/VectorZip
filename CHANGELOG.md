@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.11] — 2026-10-25
+
+**Supply-chain patch release.** No format change and no
+behaviour change: archives written by any earlier version
+decompress exactly as before, and 1.2.11 writes the same
+format the previous compressor wrote.
+
+### Security
+- Every install set is now hash-locked. The runtime, dev,
+  build, lint, and publish sets each carry a committed lock
+  (`requirements*.lock.txt`), and every workflow installs
+  with `pip install --require-hashes` — each package is
+  verified against its recorded SHA-256, and a mismatch
+  fails the install loudly. See `REQUIRE-HASHES.md` for the
+  two documented exceptions (build isolation, and end-user
+  direct installs, which carry exact pins but cannot carry a
+  lock).
+
+### Tests
+- Functional bug hunt (this release train): no defects
+  found. The full suite passes (113 passed). Compress →
+  decompress round-trips were run end to end through the CLI
+  on fixture files (repetitive text, random data, empty,
+  one-byte, all-zero, mixed binary, a multi-chunk file, and
+  names with spaces and non-ASCII characters) — every file
+  came back byte-identical. Corrupt, truncated, and
+  bit-flipped archives are refused with a plain error and
+  their partial output quarantined; the decompression
+  safety cap refuses an over-cap expansion the same way.
+  The window was built offscreen: every button is wired.
+
+
 ## [1.2.10] — 2026-10-24
 
 **Fleet Sweep #5: decoder strictness, a byte-identical speedup, and a
